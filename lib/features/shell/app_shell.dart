@@ -50,6 +50,11 @@ class AppShell extends ConsumerWidget {
             label: 'Matches',
           ),
           NavigationDestination(
+            icon: Icon(Icons.groups_2_outlined),
+            selectedIcon: Icon(Icons.groups_2_rounded),
+            label: 'Circles',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.inbox_outlined),
             selectedIcon: Icon(Icons.inbox_rounded),
             label: 'Requests',

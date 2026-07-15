@@ -1,8 +1,12 @@
 import '../mock/mock_data.dart';
 import '../models/app_state.dart';
 import '../models/commute.dart';
+import '../models/commute_circle.dart';
+import '../models/commute_request.dart';
 import '../models/commuter_profile.dart';
+import '../models/journey.dart';
 import '../models/match_result.dart';
+import '../models/reliability_profile.dart';
 import '../models/ride_request.dart';
 import '../models/workplace.dart';
 import '../services/local_storage_service.dart';
@@ -65,4 +69,47 @@ class MockMatchRepository implements MatchRepository {
 class MockRideRequestRepository implements RideRequestRepository {
   @override
   List<RideRequest> seededRequests() => MockData.seededRequests();
+}
+
+class MockCommuteCircleRepository implements CommuteCircleRepository {
+  @override
+  Future<RepositoryResult<List<CommuteCircle>>> getCircles() async =>
+      RepositoryResult.data(MockData.commuteCircles());
+
+  @override
+  Future<RepositoryResult<CommuteCircle>> getCircle(String id) async {
+    try {
+      return RepositoryResult.data(MockData.circle(id));
+    } on StateError {
+      return const RepositoryResult.failure('Commute Circle not found.');
+    }
+  }
+}
+
+class MockJourneyRepository implements JourneyRepository {
+  @override
+  Future<RepositoryResult<List<JourneyOccurrence>>> getJourneys() async =>
+      RepositoryResult.data(MockData.journeys());
+}
+
+class MockReliabilityRepository implements ReliabilityRepository {
+  @override
+  Future<RepositoryResult<CommuteReliabilityProfile>> getForProfile(
+    String id,
+  ) async => RepositoryResult.data(MockData.reliabilityFor(id));
+}
+
+class MockWorkplaceVerificationRepository
+    implements WorkplaceVerificationRepository {
+  @override
+  Future<RepositoryResult<bool>> verify({
+    required String email,
+    required String code,
+  }) async => RepositoryResult.data(code == '246810');
+}
+
+class MockCommuteRequestRepository implements CommuteRequestRepository {
+  @override
+  Future<RepositoryResult<List<CommuteRequest>>> getRequests() async =>
+      RepositoryResult.data(MockData.commuteRequests());
 }

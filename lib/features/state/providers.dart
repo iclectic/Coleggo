@@ -40,6 +40,27 @@ final rideRequestRepositoryProvider = Provider<RideRequestRepository>(
   (ref) => MockRideRequestRepository(),
 );
 
+final commuteCircleRepositoryProvider = Provider<CommuteCircleRepository>(
+  (ref) => MockCommuteCircleRepository(),
+);
+
+final journeyRepositoryProvider = Provider<JourneyRepository>(
+  (ref) => MockJourneyRepository(),
+);
+
+final reliabilityRepositoryProvider = Provider<ReliabilityRepository>(
+  (ref) => MockReliabilityRepository(),
+);
+
+final workplaceVerificationRepositoryProvider =
+    Provider<WorkplaceVerificationRepository>(
+      (ref) => MockWorkplaceVerificationRepository(),
+    );
+
+final commuteRequestRepositoryProvider = Provider<CommuteRequestRepository>(
+  (ref) => MockCommuteRequestRepository(),
+);
+
 final appControllerProvider = NotifierProvider<AppController, AppState>(
   AppController.new,
 );

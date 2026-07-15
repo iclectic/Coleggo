@@ -1,5 +1,11 @@
+import '../models/commute_circle.dart';
+import '../models/commute_request.dart';
 import '../models/commuter_profile.dart';
+import '../models/journey.dart';
+import '../models/private_commute_location.dart';
+import '../models/reliability_profile.dart';
 import '../models/ride_request.dart';
+import '../models/shift_pattern.dart';
 import '../models/workplace.dart';
 
 abstract final class MockData {
@@ -89,6 +95,19 @@ abstract final class MockData {
     'Solihull': 'Solihull to Birmingham corridor',
     'Sutton North': 'North Birmingham to city centre',
     'Yardley': 'East Birmingham to city centre',
+  };
+
+  static const areaPostcodeDistricts = <String, String>{
+    'Bearwood': 'B67',
+    'Bournville': 'B30',
+    'Erdington': 'B23',
+    'Harborne': 'B17',
+    'Kings Heath': 'B14',
+    'Moseley': 'B13',
+    'Selly Oak': 'B29',
+    'Solihull': 'B91',
+    'Sutton North': 'B74',
+    'Yardley': 'B25',
   };
 
   static final commuters = <CommuterProfile>[
@@ -413,11 +432,203 @@ abstract final class MockData {
     ),
   ];
 
+  static List<CommuteCircle> commuteCircles() => [
+    CommuteCircle(
+      id: 'circle-solihull-early',
+      name: 'Solihull Early Shift Circle',
+      workplaceId: 'northstar',
+      worksiteId: 'central_exchange',
+      state: CommuteCircleState.active,
+      members: const [
+        CircleMember(profileId: 'p09', role: CircleMemberRole.primaryDriver),
+        CircleMember(profileId: 'p03', role: CircleMemberRole.backupDriver),
+        CircleMember(profileId: 'p05', role: CircleMemberRole.passenger),
+        CircleMember(profileId: 'local-user', role: CircleMemberRole.passenger),
+      ],
+      days: const {1, 3, 5},
+      departureWindowStartMinutes: 6 * 60 + 40,
+      departureWindowEndMinutes: 6 * 60 + 55,
+      arrivalTargetMinutes: 7 * 60,
+      meetingPointArea: 'Solihull station entrance',
+      availableSeats: 1,
+      rules: const [
+        'Use public meeting points only.',
+        'Confirm by 20:00 the evening before.',
+        'No home addresses in circle notes.',
+      ],
+      shiftPattern: ShiftPattern.early.copyWith(recurringDays: const {1, 3, 5}),
+      activity: [
+        CircleActivity(
+          id: 'act-1',
+          label: '3 of 4 members confirmed for tomorrow',
+          createdAt: DateTime(2026, 7, 15, 18),
+        ),
+      ],
+      reliabilitySummaries: const [
+        CommuteReliabilityProfile(
+          profileId: 'circle-solihull-early',
+          signals: [
+            ReliabilitySignal(
+              type: ReliabilitySignalType.recurringParticipation,
+              label: '3 of 4 members confirmed this week',
+              count: 3,
+            ),
+          ],
+        ),
+      ],
+    ),
+    CommuteCircle(
+      id: 'circle-moseley-late',
+      name: 'Moseley Late Shift Circle',
+      workplaceId: 'northstar',
+      worksiteId: 'central_exchange',
+      state: CommuteCircleState.forming,
+      members: const [
+        CircleMember(profileId: 'p04', role: CircleMemberRole.primaryDriver),
+        CircleMember(profileId: 'p14', role: CircleMemberRole.passenger),
+      ],
+      days: const {2, 4},
+      departureWindowStartMinutes: 11 * 60 + 25,
+      departureWindowEndMinutes: 11 * 60 + 45,
+      arrivalTargetMinutes: 12 * 60,
+      meetingPointArea: 'Moseley recognised landmark',
+      availableSeats: 2,
+      rules: const ['Confirm plans before each journey.'],
+      shiftPattern: ShiftPattern.late.copyWith(recurringDays: const {2, 4}),
+    ),
+    CommuteCircle(
+      id: 'circle-yardley-night',
+      name: 'Yardley Night Shift Circle',
+      workplaceId: 'northstar',
+      worksiteId: 'central_exchange',
+      state: CommuteCircleState.forming,
+      members: const [
+        CircleMember(profileId: 'p07', role: CircleMemberRole.primaryDriver),
+        CircleMember(profileId: 'p17', role: CircleMemberRole.passenger),
+      ],
+      days: const {2, 3},
+      departureWindowStartMinutes: 19 * 60 + 20,
+      departureWindowEndMinutes: 19 * 60 + 45,
+      arrivalTargetMinutes: 20 * 60,
+      meetingPointArea: 'Yardley public car park',
+      availableSeats: 1,
+      rules: const ['Night-shift members confirm by midday.'],
+      shiftPattern: ShiftPattern.night.copyWith(recurringDays: const {2, 3}),
+    ),
+  ];
+
+  static List<JourneyOccurrence> journeys() => [
+    JourneyOccurrence(
+      id: 'journey-solihull-2026-07-17',
+      circleId: 'circle-solihull-early',
+      date: DateTime(2026, 7, 17),
+      departureWindowStartMinutes: 6 * 60 + 40,
+      departureWindowEndMinutes: 6 * 60 + 55,
+      arrivalTargetMinutes: 7 * 60,
+      worksiteId: 'central_exchange',
+      status: JourneyStatus.awaitingConfirmation,
+      memberIds: const ['p09', 'p03', 'p05', 'local-user'],
+      attendance: [
+        JourneyAttendance(
+          profileId: 'p09',
+          status: JourneyAttendanceStatus.confirmed,
+          updatedAt: DateTime(2026, 7, 16, 18),
+        ),
+        JourneyAttendance(
+          profileId: 'p03',
+          status: JourneyAttendanceStatus.confirmed,
+          updatedAt: DateTime(2026, 7, 16, 18, 5),
+        ),
+        JourneyAttendance(
+          profileId: 'p05',
+          status: JourneyAttendanceStatus.confirmed,
+          updatedAt: DateTime(2026, 7, 16, 18, 10),
+        ),
+      ],
+      backupPlan: JourneyBackupPlan(
+        primaryDriverId: 'p09',
+        backupDriverId: 'p03',
+        cancellationDeadline: DateTime(2026, 7, 16, 20),
+        alternativeMatchIds: const ['p01', 'p06'],
+        publicTransportNote:
+            'Public transport alternatives will be added in a future version.',
+      ),
+    ),
+  ];
+
+  static List<CommuteRequest> commuteRequests() => [
+    CommuteRequest(
+      id: 'circle-join-1',
+      requesterProfileId: 'p12',
+      circleId: 'circle-solihull-early',
+      type: CommuteRequestType.joinCircle,
+      status: CommuteRequestStatus.pending,
+      intendedDays: const {1, 3, 5},
+      windowStartMinutes: 6 * 60 + 40,
+      windowEndMinutes: 6 * 60 + 55,
+      worksiteId: 'central_exchange',
+      seatsRequired: 1,
+      intent: CommuteArrangementIntent.recurring,
+      createdAt: DateTime(2026, 7, 15, 9),
+      expiresAt: DateTime(2026, 7, 22, 9),
+      message: 'I can join Monday, Wednesday and Friday early shifts.',
+    ),
+    CommuteRequest(
+      id: 'expired-circle-join',
+      requesterProfileId: 'local-user',
+      circleId: 'circle-moseley-late',
+      type: CommuteRequestType.joinCircle,
+      status: CommuteRequestStatus.expired,
+      intendedDays: const {2, 4},
+      windowStartMinutes: 11 * 60 + 25,
+      windowEndMinutes: 11 * 60 + 45,
+      worksiteId: 'central_exchange',
+      seatsRequired: 1,
+      intent: CommuteArrangementIntent.recurring,
+      createdAt: DateTime(2026, 7, 1, 9),
+      expiresAt: DateTime(2026, 7, 8, 9),
+    ),
+  ];
+
+  static CommuteReliabilityProfile reliabilityFor(String profileId) =>
+      CommuteReliabilityProfile(
+        profileId: profileId,
+        signals: const [
+          ReliabilitySignal(
+            type: ReliabilitySignalType.completedCommutes,
+            label: '12 completed commutes',
+            count: 12,
+          ),
+          ReliabilitySignal(
+            type: ReliabilitySignalType.responseConsistency,
+            label: 'Usually responds within one day',
+            count: 1,
+          ),
+          ReliabilitySignal(
+            type: ReliabilitySignalType.lateCancellation,
+            label: 'No late cancellations recorded',
+            count: 0,
+          ),
+        ],
+      );
+
+  static PrivateCommuteLocation privateLocationFor(String area) =>
+      PrivateCommuteLocation(
+        areaName: area,
+        postcodeDistrict: areaPostcodeDistricts[area] ?? 'B1',
+        approximateLatitude: 52.48,
+        approximateLongitude: -1.89,
+        privacyRadiusMetres: 1200,
+        preferredMeetingPointType: MeetingPointType.trainStationEntrance,
+      );
+
   static Workplace workplace(String id) =>
       workplaces.firstWhere((item) => item.id == id);
   static Worksite worksite(String id) => workplaces
       .expand((item) => item.worksites)
       .firstWhere((item) => item.id == id);
+  static CommuteCircle circle(String id) =>
+      commuteCircles().firstWhere((item) => item.id == id);
   static CommuterProfile commuter(String id) =>
       commuters.firstWhere((item) => item.id == id);
 }

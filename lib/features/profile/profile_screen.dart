@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/widgets/privacy_notice.dart';
 import '../../core/widgets/profile_avatar.dart';
 import '../../core/widgets/workplace_badge.dart';
 import '../../data/mock/mock_data.dart';
@@ -82,6 +83,12 @@ class ProfileScreen extends ConsumerWidget {
                         'Preferred times',
                         '${formatMinutes(profile.arrivalMinutes)} arrival · ${formatMinutes(profile.departureMinutes)} departure',
                       ),
+                      if (profile.shiftPattern case final shift?)
+                        _Item(
+                          Icons.work_history_outlined,
+                          'Shift pattern',
+                          '${shift.name} · ${shift.dayType.name}',
+                        ),
                       if (profile.vehicleSummary != null)
                         _Item(
                           Icons.directions_car_outlined,
@@ -92,6 +99,45 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    children: [
+                      _Item(
+                        Icons.place_outlined,
+                        'Meeting preference',
+                        profile.prefersPublicMeetingPoints
+                            ? 'Public meeting points preferred'
+                            : 'Agree meeting points case by case',
+                      ),
+                      _Item(
+                        Icons.record_voice_over_outlined,
+                        'Commute preference',
+                        profile.quietCommute
+                            ? 'Quiet commute preferred'
+                            : profile.conversationWelcome
+                            ? 'Conversation welcome'
+                            : 'No preference set',
+                      ),
+                      if (profile.accessibilityRequirements.isNotEmpty)
+                        _Item(
+                          Icons.accessible_forward_outlined,
+                          'Practical requirement',
+                          profile.accessibilityRequirements
+                              .where(
+                                (requirement) => requirement.publiclyVisible,
+                              )
+                              .map((requirement) => requirement.publicSummary)
+                              .join(', '),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const PrivacyNotice(compact: true),
               const SizedBox(height: 16),
               FilledButton.tonalIcon(
                 onPressed: () => context.push('/setup'),

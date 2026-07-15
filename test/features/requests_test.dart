@@ -46,7 +46,7 @@ void main() {
         recurring: true,
       ),
       requests: MockData.seededRequests(),
-      selectedTab: 2,
+      selectedTab: 3,
     );
     SharedPreferences.setMockInitialValues({
       LocalStorageService.stateKey: jsonEncode(state.toJson()),

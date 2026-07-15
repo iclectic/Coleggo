@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/compatibility_indicator.dart';
+import '../../core/widgets/privacy_notice.dart';
 import '../../core/widgets/profile_avatar.dart';
 import '../../core/widgets/workplace_badge.dart';
 import '../../data/mock/mock_data.dart';
@@ -72,21 +73,21 @@ class MatchDetailsScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Why you matched',
+                    'Why this is a ${match.level.label.toLowerCase()}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${match.score}% estimated compatibility',
+                    '${match.score}% estimated compatibility. Broad areas and route corridors are approximate.',
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 14),
-                  for (final reason in match.reasons)
+                  for (final reason in match.positiveReasons)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Row(
@@ -96,10 +97,31 @@ class MatchDetailsScreen extends ConsumerWidget {
                             size: 20,
                           ),
                           const SizedBox(width: 10),
-                          Expanded(child: Text(reason)),
+                          Expanded(child: Text(reason.message)),
                         ],
                       ),
                     ),
+                  if (match.limitations.isNotEmpty) ...[
+                    const Divider(height: 26),
+                    Text(
+                      'Things to consider',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    for (final limitation in match.limitations)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(limitation.message)),
+                          ],
+                        ),
+                      ),
+                  ],
                 ],
               ),
             ),
@@ -160,25 +182,7 @@ class MatchDetailsScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.privacy_tip_outlined),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Private contact details, exact addresses and precise locations are not shown. Choose a safe public pickup point if you agree to travel together.',
-                  ),
-                ),
-              ],
-            ),
-          ),
+          const PrivacyNotice(),
         ],
       ),
     );

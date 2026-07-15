@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 
 import '../data/models/app_state.dart';
 import '../data/models/ride_request.dart';
+import '../features/circles/circle_details_screen.dart';
+import '../features/circles/circles_screen.dart';
 import '../features/commute/accepted_commute_screen.dart';
 import '../features/commute/commute_form_screen.dart';
 import '../features/home/home_screen.dart';
@@ -19,7 +21,7 @@ import '../features/workplace/verification_screen.dart';
 import '../features/workplace/workplace_search_screen.dart';
 
 GoRouter createRouter(AppState state) {
-  final initialLocation = !state.onboardingComplete
+  String setupLocation() => !state.onboardingComplete
       ? '/onboarding'
       : state.selectedWorkplaceId == null
       ? '/workplace'
@@ -29,12 +31,28 @@ GoRouter createRouter(AppState state) {
       ? '/setup'
       : switch (state.selectedTab) {
           1 => '/matches',
-          2 => '/requests',
-          3 => '/profile',
+          2 => '/circles',
+          3 => '/requests',
+          4 => '/profile',
           _ => '/home',
         };
+
+  final initialLocation = setupLocation();
   return GoRouter(
     initialLocation: initialLocation,
+    redirect: (context, routerState) {
+      final location = routerState.matchedLocation;
+      final setupRoute = setupLocation();
+      final isSetupRoute = {
+        '/onboarding',
+        '/workplace',
+        '/verify',
+        '/setup',
+      }.contains(location);
+      if (!state.setupComplete && location != setupRoute) return setupRoute;
+      if (state.setupComplete && isSetupRoute) return '/home';
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/onboarding',
@@ -74,6 +92,14 @@ GoRouter createRouter(AppState state) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/circles',
+                builder: (context, state) => const CirclesScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/requests',
                 builder: (context, state) => const RequestsScreen(),
               ),
@@ -88,6 +114,11 @@ GoRouter createRouter(AppState state) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/circles/:circleId',
+        builder: (context, state) =>
+            CircleDetailsScreen(circleId: state.pathParameters['circleId']!),
       ),
       GoRoute(
         path: '/matches/:profileId',
