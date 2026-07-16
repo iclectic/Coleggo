@@ -2,6 +2,7 @@ import 'package:coleggo/data/mock/mock_data.dart';
 import 'package:coleggo/data/models/cancellation_record.dart';
 import 'package:coleggo/data/models/app_state.dart';
 import 'package:coleggo/data/models/journey.dart';
+import 'package:coleggo/data/models/message_thread.dart';
 import 'package:coleggo/data/services/local_storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -88,5 +89,48 @@ void main() {
     expect(restored.commuteRequests.length, 2);
     expect(restored.cancellationHistory.single.id, 'cancel-test');
     expect(restored.activeCircleId, 'circle-solihull-early');
+  });
+
+  test('restores secure message threads and moderation reports', () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = LocalStorageService(await SharedPreferences.getInstance());
+    final thread = MessageThread(
+      id: 'thread-circle-solihull-early',
+      type: MessageThreadType.commuteCircle,
+      contextId: 'circle-solihull-early',
+      participantProfileIds: const ['local-user', 'p09'],
+      messages: [
+        CommuteMessage(
+          id: 'message-1',
+          threadId: 'thread-circle-solihull-early',
+          senderProfileId: 'local-user',
+          body: 'Meet at the station entrance.',
+          sentAt: DateTime(2026, 7, 16, 19),
+        ),
+      ],
+      createdAt: DateTime(2026, 7, 16, 18),
+    );
+    final report = MessageModerationReport(
+      id: 'report-1',
+      threadId: thread.id,
+      messageId: 'message-1',
+      reporterProfileId: 'p09',
+      reason: 'Review meeting point wording',
+      createdAt: DateTime(2026, 7, 16, 20),
+    );
+
+    await service.save(
+      AppState(messageThreads: [thread], messageReports: [report]),
+    );
+    final restored = await service.load();
+
+    expect(
+      restored.messageThreads.single.messages.single.body,
+      contains('station'),
+    );
+    expect(
+      restored.messageReports.single.status,
+      ModerationReportStatus.submitted,
+    );
   });
 }

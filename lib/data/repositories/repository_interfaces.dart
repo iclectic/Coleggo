@@ -4,10 +4,12 @@ import '../models/commute_circle.dart';
 import '../models/commute_request.dart';
 import '../models/commuter_profile.dart';
 import '../models/journey.dart';
+import '../models/message_thread.dart';
 import '../models/match_result.dart';
 import '../models/reliability_profile.dart';
 import '../models/ride_request.dart';
 import '../models/workplace.dart';
+import '../models/workplace_verification.dart';
 
 class RepositoryResult<T> {
   const RepositoryResult.data(this.value) : errorMessage = null;
@@ -47,6 +49,29 @@ abstract interface class RideRequestRepository {
 abstract interface class CommuteCircleRepository {
   Future<RepositoryResult<List<CommuteCircle>>> getCircles();
   Future<RepositoryResult<CommuteCircle>> getCircle(String id);
+  Future<RepositoryResult<CommuteRequest>> requestToJoin({
+    required List<CommuteRequest> currentRequests,
+    required String requesterProfileId,
+    required String circleId,
+    required Commute commute,
+    required CommuterProfile profile,
+  });
+  Future<RepositoryResult<List<CommuteCircle>>> applyMembershipDecision({
+    required List<CommuteCircle> circles,
+    required CommuteRequest request,
+    required CommuteRequestStatus status,
+  });
+  Future<RepositoryResult<List<CommuteCircle>>> pauseParticipation({
+    required List<CommuteCircle> circles,
+    required String circleId,
+    required String profileId,
+    required bool paused,
+  });
+  Future<RepositoryResult<List<CommuteCircle>>> leaveCircle({
+    required List<CommuteCircle> circles,
+    required String circleId,
+    required String profileId,
+  });
 }
 
 abstract interface class JourneyRepository {
@@ -58,7 +83,14 @@ abstract interface class ReliabilityRepository {
 }
 
 abstract interface class WorkplaceVerificationRepository {
+  Future<RepositoryResult<WorkplaceVerificationSession>> start({
+    required String workplaceId,
+    required String worksiteId,
+    required String email,
+  });
   Future<RepositoryResult<bool>> verify({
+    required String workplaceId,
+    required String worksiteId,
     required String email,
     required String code,
   });
@@ -66,4 +98,23 @@ abstract interface class WorkplaceVerificationRepository {
 
 abstract interface class CommuteRequestRepository {
   Future<RepositoryResult<List<CommuteRequest>>> getRequests();
+}
+
+abstract interface class MessagingRepository {
+  Future<RepositoryResult<MessageThread>> getOrCreateCircleThread({
+    required List<MessageThread> threads,
+    required CommuteCircle circle,
+    required String requesterProfileId,
+  });
+  Future<RepositoryResult<MessageThread>> sendMessage({
+    required MessageThread thread,
+    required String senderProfileId,
+    required String body,
+  });
+  Future<RepositoryResult<MessageModerationReport>> reportMessage({
+    required MessageThread thread,
+    required CommuteMessage message,
+    required String reporterProfileId,
+    required String reason,
+  });
 }

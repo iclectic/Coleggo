@@ -30,7 +30,15 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_sent) {
-      setState(() => _sent = true);
+      setState(() => _busy = true);
+      final started = await ref
+          .read(appControllerProvider.notifier)
+          .startWorkEmailVerification(_email.text.trim());
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _sent = started;
+      });
       return;
     }
     setState(() => _busy = true);
@@ -87,7 +95,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'This simulated check confirms access to a workplace email, not a person’s identity or character.',
+                    'This prototype backend check confirms access to a workplace verification method, not a person’s identity or character.',
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 28),
@@ -130,7 +138,7 @@ class _VerificationScreenState extends ConsumerState<VerificationScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       child: const Text(
-                        'Simulated email sent. No message has left this device.',
+                        'Prototype verification session created. No message has left this device.',
                       ),
                     ),
                   ],

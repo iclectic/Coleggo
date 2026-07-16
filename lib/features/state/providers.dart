@@ -61,6 +61,10 @@ final commuteRequestRepositoryProvider = Provider<CommuteRequestRepository>(
   (ref) => MockCommuteRequestRepository(),
 );
 
+final messagingRepositoryProvider = Provider<MessagingRepository>(
+  (ref) => MockMessagingRepository(),
+);
+
 final appControllerProvider = NotifierProvider<AppController, AppState>(
   AppController.new,
 );

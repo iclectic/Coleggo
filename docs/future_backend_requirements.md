@@ -24,6 +24,8 @@ The current implementation is a local prototype with mock repositories and Share
 - Secure messaging after mutual acceptance.
 - Push notifications for confirmations, requests, cancellations and backup-driver changes.
 - Notification preferences.
+- Message retention, deletion and export controls.
+- Moderation tooling for reported messages.
 
 ## Safety And Moderation
 

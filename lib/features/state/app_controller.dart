@@ -1,11 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../data/mock/mock_data.dart';
 import '../../data/models/app_state.dart';
 import '../../data/models/cancellation_record.dart';
 import '../../data/models/commute.dart';
-import '../../data/models/commute_circle.dart';
 import '../../data/models/commute_request.dart';
 import '../../data/models/commuter_profile.dart';
 import '../../data/models/journey.dart';
@@ -48,8 +46,36 @@ class AppController extends Notifier<AppState> {
         ),
       );
 
+  Future<bool> startWorkEmailVerification(String email) async {
+    final workplaceId = state.selectedWorkplaceId;
+    final worksiteId = state.selectedWorksiteId;
+    if (workplaceId == null || worksiteId == null) return false;
+    final result = await ref
+        .read(workplaceVerificationRepositoryProvider)
+        .start(workplaceId: workplaceId, worksiteId: worksiteId, email: email);
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage:
+            result.errorMessage ?? 'Your verification code was not sent.',
+      );
+      return false;
+    }
+    return true;
+  }
+
   Future<bool> verifyWorkEmail(String email, String code) async {
-    if (code != AppConstants.mockCode) return false;
+    final workplaceId = state.selectedWorkplaceId;
+    final worksiteId = state.selectedWorksiteId;
+    if (workplaceId == null || worksiteId == null) return false;
+    final result = await ref
+        .read(workplaceVerificationRepositoryProvider)
+        .verify(
+          workplaceId: workplaceId,
+          worksiteId: worksiteId,
+          email: email,
+          code: code,
+        );
+    if (result.hasError || result.value != true) return false;
     await _setAndPersist(
       state.copyWith(workEmail: email, workplaceVerified: true),
     );
@@ -158,32 +184,25 @@ class AppController extends Notifier<AppState> {
     final profile = state.profile;
     final commute = state.commute;
     if (profile == null || commute == null) return false;
-    final duplicate = state.commuteRequests.any(
-      (request) =>
-          request.circleId == circleId &&
-          request.requesterProfileId == profile.id &&
-          request.type == CommuteRequestType.joinCircle &&
-          request.isActive,
-    );
-    if (duplicate) return false;
-    final request = CommuteRequest(
-      id: 'circle-${DateTime.now().microsecondsSinceEpoch}',
-      requesterProfileId: profile.id,
-      circleId: circleId,
-      type: CommuteRequestType.joinCircle,
-      status: CommuteRequestStatus.pending,
-      intendedDays: commute.days,
-      windowStartMinutes: commute.arrivalMinutes - 45,
-      windowEndMinutes: commute.arrivalMinutes,
-      worksiteId: commute.worksiteId,
-      seatsRequired: profile.role.canRide ? 1 : 0,
-      intent: CommuteArrangementIntent.recurring,
-      createdAt: DateTime.now(),
-      expiresAt: DateTime.now().add(const Duration(days: 7)),
-      message: 'I would like to join this circle for my regular work commute.',
-    );
+    final result = await ref
+        .read(commuteCircleRepositoryProvider)
+        .requestToJoin(
+          currentRequests: state.commuteRequests,
+          requesterProfileId: profile.id,
+          circleId: circleId,
+          commute: commute,
+          profile: profile,
+        );
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage: result.errorMessage ?? 'Your join request was not sent.',
+      );
+      return false;
+    }
     await _setAndPersist(
-      state.copyWith(commuteRequests: [...state.commuteRequests, request]),
+      state.copyWith(
+        commuteRequests: [...state.commuteRequests, result.value!],
+      ),
     );
     return true;
   }
@@ -204,40 +223,19 @@ class AppController extends Notifier<AppState> {
         .toList();
     var circles = state.circles;
     var activeCircleId = state.activeCircleId;
+    final membershipResult = await ref
+        .read(commuteCircleRepositoryProvider)
+        .applyMembershipDecision(
+          circles: state.circles,
+          request: currentRequest,
+          status: status,
+        );
+    if (!membershipResult.hasError && membershipResult.value != null) {
+      circles = membershipResult.value!;
+    }
     if (status == CommuteRequestStatus.accepted &&
         currentRequest.type == CommuteRequestType.joinCircle &&
         currentRequest.circleId != null) {
-      circles = circles.map((circle) {
-        if (circle.id != currentRequest.circleId) return circle;
-        final alreadyMember = circle.members.any(
-          (member) => member.profileId == currentRequest.requesterProfileId,
-        );
-        if (alreadyMember) return circle;
-        final members = [
-          ...circle.members,
-          CircleMember(
-            profileId: currentRequest.requesterProfileId,
-            role: CircleMemberRole.passenger,
-          ),
-        ];
-        final seats = (circle.availableSeats - currentRequest.seatsRequired)
-            .clamp(0, 99);
-        return circle.copyWith(
-          members: members,
-          availableSeats: seats,
-          state: seats == 0
-              ? CommuteCircleState.full
-              : CommuteCircleState.active,
-          activity: [
-            CircleActivity(
-              id: 'activity-${DateTime.now().microsecondsSinceEpoch}',
-              label: 'Join request accepted',
-              createdAt: DateTime.now(),
-            ),
-            ...circle.activity,
-          ],
-        );
-      }).toList();
       activeCircleId = currentRequest.circleId;
     }
     await _setAndPersist(
@@ -252,49 +250,43 @@ class AppController extends Notifier<AppState> {
   Future<void> pauseCircleParticipation(String circleId, bool paused) async {
     final profileId = state.profile?.id;
     if (profileId == null) return;
-    final circles = state.circles.map((circle) {
-      if (circle.id != circleId) return circle;
-      final members = circle.members
-          .map(
-            (member) => member.profileId == profileId
-                ? member.copyWith(
-                    status: paused
-                        ? CircleParticipationStatus.paused
-                        : CircleParticipationStatus.active,
-                  )
-                : member,
-          )
-          .toList();
-      return circle.copyWith(
-        members: members,
-        state: paused ? CommuteCircleState.paused : CommuteCircleState.active,
+    final result = await ref
+        .read(commuteCircleRepositoryProvider)
+        .pauseParticipation(
+          circles: state.circles,
+          circleId: circleId,
+          profileId: profileId,
+          paused: paused,
+        );
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage:
+            result.errorMessage ?? 'Your circle participation was not updated.',
       );
-    }).toList();
-    await _setAndPersist(state.copyWith(circles: circles));
+      return;
+    }
+    await _setAndPersist(state.copyWith(circles: result.value));
   }
 
   Future<void> leaveCircle(String circleId) async {
     final profileId = state.profile?.id;
     if (profileId == null) return;
-    final circles = state.circles.map((circle) {
-      if (circle.id != circleId) return circle;
-      final wasMember = circle.members.any(
-        (member) => member.profileId == profileId,
+    final result = await ref
+        .read(commuteCircleRepositoryProvider)
+        .leaveCircle(
+          circles: state.circles,
+          circleId: circleId,
+          profileId: profileId,
+        );
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage: result.errorMessage ?? 'You could not leave this circle.',
       );
-      final members = circle.members
-          .where((member) => member.profileId != profileId)
-          .toList();
-      return circle.copyWith(
-        members: members,
-        availableSeats: wasMember
-            ? (circle.availableSeats + 1).clamp(0, 99)
-            : circle.availableSeats,
-        state: CommuteCircleState.forming,
-      );
-    }).toList();
+      return;
+    }
     await _setAndPersist(
       state.copyWith(
-        circles: circles,
+        circles: result.value,
         activeCircleId: state.activeCircleId == circleId
             ? null
             : state.activeCircleId,
@@ -372,6 +364,93 @@ class AppController extends Notifier<AppState> {
         )
         .toList();
     await _setAndPersist(state.copyWith(journeys: journeys));
+  }
+
+  Future<String?> openCircleThread(String circleId) async {
+    final profileId = state.profile?.id;
+    if (profileId == null) return null;
+    final circle = state.circles
+        .where((item) => item.id == circleId)
+        .firstOrNull;
+    if (circle == null) return null;
+    final result = await ref
+        .read(messagingRepositoryProvider)
+        .getOrCreateCircleThread(
+          threads: state.messageThreads,
+          circle: circle,
+          requesterProfileId: profileId,
+        );
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage:
+            result.errorMessage ?? 'Secure messaging is not available yet.',
+      );
+      return null;
+    }
+    final thread = result.value!;
+    final threads = [
+      ...state.messageThreads.where((item) => item.id != thread.id),
+      thread,
+    ];
+    await _setAndPersist(state.copyWith(messageThreads: threads));
+    return thread.id;
+  }
+
+  Future<bool> sendThreadMessage(String threadId, String body) async {
+    final profileId = state.profile?.id;
+    if (profileId == null) return false;
+    final thread = state.messageThreads
+        .where((item) => item.id == threadId)
+        .firstOrNull;
+    if (thread == null) return false;
+    final result = await ref
+        .read(messagingRepositoryProvider)
+        .sendMessage(thread: thread, senderProfileId: profileId, body: body);
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage: result.errorMessage ?? 'Your message was not saved.',
+      );
+      return false;
+    }
+    final threads = state.messageThreads
+        .map((item) => item.id == threadId ? result.value! : item)
+        .toList();
+    await _setAndPersist(state.copyWith(messageThreads: threads));
+    return true;
+  }
+
+  Future<bool> reportThreadMessage({
+    required String threadId,
+    required String messageId,
+    required String reason,
+  }) async {
+    final profileId = state.profile?.id;
+    if (profileId == null) return false;
+    final thread = state.messageThreads
+        .where((item) => item.id == threadId)
+        .firstOrNull;
+    final message = thread?.messages
+        .where((item) => item.id == messageId)
+        .firstOrNull;
+    if (thread == null || message == null) return false;
+    final result = await ref
+        .read(messagingRepositoryProvider)
+        .reportMessage(
+          thread: thread,
+          message: message,
+          reporterProfileId: profileId,
+          reason: reason,
+        );
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage: result.errorMessage ?? 'The report was not submitted.',
+      );
+      return false;
+    }
+    await _setAndPersist(
+      state.copyWith(messageReports: [...state.messageReports, result.value!]),
+    );
+    return true;
   }
 
   Future<void> setTheme(AppThemePreference preference) =>

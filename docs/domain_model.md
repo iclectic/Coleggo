@@ -47,3 +47,11 @@
 ## Backup Plans
 
 `JourneyBackupPlan` stores primary driver, optional backup driver, cancellation deadline, alternative colleague matches and a public transport note placeholder.
+
+## Messaging
+
+`MessageThread` stores asynchronous prototype messages for accepted contexts such as Commute Circles. Threads are only accessible to participants. `CommuteMessage` stores sender, body, timestamp and delivery state. Messages are local in the prototype and are not real-time chat.
+
+## Moderation Reports
+
+`MessageModerationReport` records a local moderation report against a message with reporter, reason, timestamp and status. This provides a future backend boundary without claiming active production moderation in the prototype.

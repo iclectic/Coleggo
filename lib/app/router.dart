@@ -11,6 +11,7 @@ import '../features/home/home_screen.dart';
 import '../features/matches/match_details_screen.dart';
 import '../features/matches/matches_screen.dart';
 import '../features/matches/request_confirmation_screen.dart';
+import '../features/messages/message_thread_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/profile/profile_setup_screen.dart';
@@ -124,6 +125,11 @@ GoRouter createRouter(AppState state) {
         path: '/matches/:profileId',
         builder: (context, state) =>
             MatchDetailsScreen(profileId: state.pathParameters['profileId']!),
+      ),
+      GoRoute(
+        path: '/messages/:threadId',
+        builder: (context, state) =>
+            MessageThreadScreen(threadId: state.pathParameters['threadId']!),
       ),
       GoRoute(
         path: '/matches/:profileId/confirm',

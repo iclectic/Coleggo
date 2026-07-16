@@ -75,6 +75,27 @@ class AcceptedCommuteScreen extends ConsumerWidget {
             child: Padding(
               padding: const EdgeInsets.all(18),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Messaging',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Secure messaging is enabled for accepted Commute Circles in this prototype. One-to-one accepted commute messaging will use the same moderation boundary later.',
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
                 children: [
                   Row(
                     children: [

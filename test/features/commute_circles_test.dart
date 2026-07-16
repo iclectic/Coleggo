@@ -84,6 +84,35 @@ void main() {
 
     expect(find.text('Backup driver: Asha'), findsOneWidget);
   });
+
+  testWidgets('accepted circle members can open and send secure messages', (
+    tester,
+  ) async {
+    await _pumpApp(tester, _state(selectedTab: 2));
+
+    await tester.tap(
+      find
+          .ancestor(
+            of: find.text('Solihull Early Shift Circle'),
+            matching: find.byType(InkWell),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('Open secure messages'), 220);
+    await tester.tap(find.text('Open secure messages'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Secure messages'), findsOneWidget);
+    await tester.enterText(
+      find.byType(TextField),
+      'Can we meet by the station entrance?',
+    );
+    await tester.tap(find.byTooltip('Send message'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Can we meet by the station entrance?'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpApp(WidgetTester tester, AppState state) async {

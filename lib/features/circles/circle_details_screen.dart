@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/formatters.dart';
@@ -97,9 +98,7 @@ class CircleDetailsScreen extends ConsumerWidget {
               const SizedBox(height: 16),
               _Section(
                 title: 'Messaging',
-                child: const Text(
-                  'Circle messaging will be introduced later. For this prototype, Coleggo shows the agreed schedule, confirmations and activity without pretending that live chat is available.',
-                ),
+                child: _MessagingAccess(circle: circle, membership: membership),
               ),
               const SizedBox(height: 16),
               _Section(
@@ -164,6 +163,44 @@ class CircleDetailsScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _MessagingAccess extends ConsumerWidget {
+  const _MessagingAccess({required this.circle, required this.membership});
+
+  final CommuteCircle circle;
+  final CircleMember? membership;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeMember = membership?.status == CircleParticipationStatus.active;
+    if (!activeMember) {
+      return const Text(
+        'Secure messaging becomes available after your circle membership is accepted and active. It is not available for public discovery.',
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Message accepted circle members about meeting-point details and confirmation questions. This prototype stores messages locally and does not provide real-time chat.',
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () async {
+            final threadId = await ref
+                .read(appControllerProvider.notifier)
+                .openCircleThread(circle.id);
+            if (context.mounted && threadId != null) {
+              context.push('/messages/$threadId');
+            }
+          },
+          icon: const Icon(Icons.lock_outline_rounded),
+          label: const Text('Open secure messages'),
+        ),
+      ],
     );
   }
 }
