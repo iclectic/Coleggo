@@ -55,3 +55,7 @@
 ## Moderation Reports
 
 `MessageModerationReport` records a local moderation report against a message with reporter, reason, timestamp and status. This provides a future backend boundary without claiming active production moderation in the prototype.
+
+## Notifications
+
+`CommuteNotification` stores in-app notification records for journey confirmations, circle join requests, cancellations, backup-driver changes and secure messages. Notifications are local prototype records with read state, priority and optional context route. They are not push notifications.

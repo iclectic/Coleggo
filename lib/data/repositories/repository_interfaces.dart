@@ -5,6 +5,7 @@ import '../models/commute_request.dart';
 import '../models/commuter_profile.dart';
 import '../models/journey.dart';
 import '../models/message_thread.dart';
+import '../models/notification_record.dart';
 import '../models/match_result.dart';
 import '../models/reliability_profile.dart';
 import '../models/ride_request.dart';
@@ -116,5 +117,22 @@ abstract interface class MessagingRepository {
     required CommuteMessage message,
     required String reporterProfileId,
     required String reason,
+  });
+}
+
+abstract interface class NotificationRepository {
+  Future<RepositoryResult<CommuteNotification>> create({
+    required CommuteNotificationType type,
+    required String title,
+    required String body,
+    required CommuteNotificationPriority priority,
+    String? contextRoute,
+  });
+  Future<RepositoryResult<List<CommuteNotification>>> markRead({
+    required List<CommuteNotification> notifications,
+    required String notificationId,
+  });
+  Future<RepositoryResult<List<CommuteNotification>>> markAllRead({
+    required List<CommuteNotification> notifications,
   });
 }

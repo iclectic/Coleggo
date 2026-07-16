@@ -13,6 +13,7 @@
 - Refined the home dashboard around next journey, action centre, active circle, requests, matches and reliability.
 - Added a prototype backend boundary for workplace verification sessions and Commute Circle membership decisions.
 - Added secure asynchronous prototype messaging for accepted active Commute Circle members with local moderation-report hooks.
+- Added in-app notification records for confirmations, circle requests, cancellations, backup-driver changes and messages.
 
 ## Files Changed
 
@@ -27,7 +28,9 @@ Key areas changed:
 - `lib/features/profile/profile_screen.dart`: commute-focused profile details.
 - `lib/data/models/workplace_verification.dart`: backend-shaped verification session model.
 - `lib/data/models/message_thread.dart`: message threads, messages and moderation reports.
+- `lib/data/models/notification_record.dart`: in-app notification records with read state and priority.
 - `lib/features/messages/`: secure message thread UI.
+- `lib/features/notifications/`: notification list and read actions.
 - `test/`: matching, storage and circle widget coverage.
 - `docs/`: audit, implementation plan, product differentiation, domain model, privacy principles, future backend requirements.
 
@@ -38,6 +41,7 @@ Key areas changed:
 - Kept mock implementations clearly separated from domain models and UI.
 - Moved workplace verification and circle membership decisions behind repository contracts, ready for a future backend swap.
 - Kept messaging asynchronous and participant-scoped, with reports stored locally rather than pretending live production moderation exists.
+- Kept notifications in-app and local, without pretending push notifications are available.
 - Kept matching deterministic and explainable instead of using AI or route magic.
 - Treated ineligible matches as limited even when non-essential score factors are high.
 - Avoided real-time chat, live location, payments and unsupported safety verification claims.
@@ -59,6 +63,7 @@ Key areas changed:
 - Widget coverage for dashboard confirmation, joining a circle, accepting a circle request, cancelling a journey and selecting a backup driver.
 - Repository coverage for verification sessions, duplicate circle join prevention and accepted membership application.
 - Messaging coverage for participant-only thread creation, sending, risky-language flagging, reporting and persisted restart.
+- Notification coverage for creation, read state, persistence and dashboard access.
 
 ## Commands Run
 
@@ -71,7 +76,7 @@ Key areas changed:
 ## Results
 
 - `flutter analyze`: passed.
-- `flutter test`: passed, 26 tests.
+- `flutter test`: passed, 29 tests.
 - `flutter build apk --debug`: passed, built `build/app/outputs/flutter-apk/app-debug.apk`.
 
 ## Remaining Warnings

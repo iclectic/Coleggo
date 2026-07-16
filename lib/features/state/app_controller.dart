@@ -7,6 +7,7 @@ import '../../data/models/commute.dart';
 import '../../data/models/commute_request.dart';
 import '../../data/models/commuter_profile.dart';
 import '../../data/models/journey.dart';
+import '../../data/models/notification_record.dart';
 import '../../data/models/ride_request.dart';
 import 'providers.dart';
 
@@ -32,6 +33,27 @@ class AppController extends Notifier<AppState> {
             'Your change was kept for this session but could not be saved.',
       );
     }
+  }
+
+  Future<AppState> _withNotification(
+    AppState base, {
+    required CommuteNotificationType type,
+    required String title,
+    required String body,
+    required CommuteNotificationPriority priority,
+    String? contextRoute,
+  }) async {
+    final result = await ref
+        .read(notificationRepositoryProvider)
+        .create(
+          type: type,
+          title: title,
+          body: body,
+          priority: priority,
+          contextRoute: contextRoute,
+        );
+    if (result.hasError || result.value == null) return base;
+    return base.copyWith(notifications: [result.value!, ...base.notifications]);
   }
 
   Future<void> completeOnboarding() =>
@@ -199,11 +221,17 @@ class AppController extends Notifier<AppState> {
       );
       return false;
     }
-    await _setAndPersist(
+    final next = await _withNotification(
       state.copyWith(
         commuteRequests: [...state.commuteRequests, result.value!],
       ),
+      type: CommuteNotificationType.joinRequest,
+      title: 'Circle request sent',
+      body: 'Your request to join this Commute Circle has been saved.',
+      priority: CommuteNotificationPriority.normal,
+      contextRoute: '/circles/$circleId',
     );
+    await _setAndPersist(next);
     return true;
   }
 
@@ -238,13 +266,24 @@ class AppController extends Notifier<AppState> {
         currentRequest.circleId != null) {
       activeCircleId = currentRequest.circleId;
     }
-    await _setAndPersist(
-      state.copyWith(
-        commuteRequests: requests,
-        circles: circles,
-        activeCircleId: activeCircleId,
-      ),
+    var next = state.copyWith(
+      commuteRequests: requests,
+      circles: circles,
+      activeCircleId: activeCircleId,
     );
+    if (status == CommuteRequestStatus.accepted) {
+      next = await _withNotification(
+        next,
+        type: CommuteNotificationType.joinRequest,
+        title: 'Circle request accepted',
+        body: 'A colleague has been added to the Commute Circle.',
+        priority: CommuteNotificationPriority.actionRequired,
+        contextRoute: currentRequest.circleId == null
+            ? '/requests'
+            : '/circles/${currentRequest.circleId}',
+      );
+    }
+    await _setAndPersist(next);
   }
 
   Future<void> pauseCircleParticipation(String circleId, bool paused) async {
@@ -300,6 +339,10 @@ class AppController extends Notifier<AppState> {
   ) async {
     final profileId = state.profile?.id;
     if (profileId == null) return;
+    final selectedJourney = state.journeys
+        .where((item) => item.id == journeyId)
+        .firstOrNull;
+    if (selectedJourney == null) return;
     final journeys = state.journeys.map((journey) {
       if (journey.id != journeyId) return journey;
       final attendance = [
@@ -312,7 +355,17 @@ class AppController extends Notifier<AppState> {
       ];
       return journey.copyWith(attendance: attendance);
     }).toList();
-    await _setAndPersist(state.copyWith(journeys: journeys));
+    final next = await _withNotification(
+      state.copyWith(journeys: journeys),
+      type: CommuteNotificationType.journeyConfirmation,
+      title: 'Journey response saved',
+      body: 'Your attendance response has been recorded for the next commute.',
+      priority: status == JourneyAttendanceStatus.undecided
+          ? CommuteNotificationPriority.normal
+          : CommuteNotificationPriority.actionRequired,
+      contextRoute: '/circles/${selectedJourney.circleId}',
+    );
+    await _setAndPersist(next);
   }
 
   Future<void> cancelJourney(String journeyId, {String? reason}) async {
@@ -342,15 +395,26 @@ class AppController extends Notifier<AppState> {
               : item,
         )
         .toList();
-    await _setAndPersist(
+    final next = await _withNotification(
       state.copyWith(
         journeys: journeys,
         cancellationHistory: [...state.cancellationHistory, cancellation],
       ),
+      type: CommuteNotificationType.cancellation,
+      title: 'Journey cancelled',
+      body:
+          '${cancellation.affectedProfileIds.length} circle members are affected.',
+      priority: CommuteNotificationPriority.urgent,
+      contextRoute: '/circles/${journey.circleId}',
     );
+    await _setAndPersist(next);
   }
 
   Future<void> selectBackupDriver(String journeyId, String profileId) async {
+    final selectedJourney = state.journeys
+        .where((item) => item.id == journeyId)
+        .firstOrNull;
+    if (selectedJourney == null) return;
     final journeys = state.journeys
         .map(
           (journey) => journey.id == journeyId
@@ -363,7 +427,15 @@ class AppController extends Notifier<AppState> {
               : journey,
         )
         .toList();
-    await _setAndPersist(state.copyWith(journeys: journeys));
+    final next = await _withNotification(
+      state.copyWith(journeys: journeys),
+      type: CommuteNotificationType.backupDriver,
+      title: 'Backup driver selected',
+      body: 'A replacement driver has been selected for the commute.',
+      priority: CommuteNotificationPriority.actionRequired,
+      contextRoute: '/circles/${selectedJourney.circleId}',
+    );
+    await _setAndPersist(next);
   }
 
   Future<String?> openCircleThread(String circleId) async {
@@ -415,8 +487,37 @@ class AppController extends Notifier<AppState> {
     final threads = state.messageThreads
         .map((item) => item.id == threadId ? result.value! : item)
         .toList();
-    await _setAndPersist(state.copyWith(messageThreads: threads));
+    final next = await _withNotification(
+      state.copyWith(messageThreads: threads),
+      type: CommuteNotificationType.message,
+      title: 'Message saved',
+      body: 'Your secure circle message has been stored locally.',
+      priority: CommuteNotificationPriority.normal,
+      contextRoute: '/messages/$threadId',
+    );
+    await _setAndPersist(next);
     return true;
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    final result = await ref
+        .read(notificationRepositoryProvider)
+        .markRead(
+          notifications: state.notifications,
+          notificationId: notificationId,
+        );
+    if (!result.hasError && result.value != null) {
+      await _setAndPersist(state.copyWith(notifications: result.value));
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final result = await ref
+        .read(notificationRepositoryProvider)
+        .markAllRead(notifications: state.notifications);
+    if (!result.hasError && result.value != null) {
+      await _setAndPersist(state.copyWith(notifications: result.value));
+    }
   }
 
   Future<bool> reportThreadMessage({

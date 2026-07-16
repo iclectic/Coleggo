@@ -5,6 +5,7 @@ import 'commute_request.dart';
 import 'commuter_profile.dart';
 import 'journey.dart';
 import 'message_thread.dart';
+import 'notification_record.dart';
 import 'reliability_profile.dart';
 import 'ride_request.dart';
 
@@ -28,6 +29,7 @@ class AppState {
     this.cancellationHistory = const [],
     this.messageThreads = const [],
     this.messageReports = const [],
+    this.notifications = const [],
     this.activeCircleId,
     this.themePreference = AppThemePreference.system,
     this.selectedTab = 0,
@@ -50,6 +52,7 @@ class AppState {
   final List<CancellationRecord> cancellationHistory;
   final List<MessageThread> messageThreads;
   final List<MessageModerationReport> messageReports;
+  final List<CommuteNotification> notifications;
   final String? activeCircleId;
   final AppThemePreference themePreference;
   final int selectedTab;
@@ -74,6 +77,7 @@ class AppState {
     List<CancellationRecord>? cancellationHistory,
     List<MessageThread>? messageThreads,
     List<MessageModerationReport>? messageReports,
+    List<CommuteNotification>? notifications,
     String? activeCircleId,
     AppThemePreference? themePreference,
     int? selectedTab,
@@ -96,6 +100,7 @@ class AppState {
     cancellationHistory: cancellationHistory ?? this.cancellationHistory,
     messageThreads: messageThreads ?? this.messageThreads,
     messageReports: messageReports ?? this.messageReports,
+    notifications: notifications ?? this.notifications,
     activeCircleId: activeCircleId ?? this.activeCircleId,
     themePreference: themePreference ?? this.themePreference,
     selectedTab: selectedTab ?? this.selectedTab,
@@ -103,7 +108,7 @@ class AppState {
   );
 
   Map<String, dynamic> toJson() => {
-    'schemaVersion': 3,
+    'schemaVersion': 4,
     'onboardingComplete': onboardingComplete,
     'selectedWorkplaceId': selectedWorkplaceId,
     'selectedWorksiteId': selectedWorksiteId,
@@ -125,6 +130,9 @@ class AppState {
         .toList(),
     'messageThreads': messageThreads.map((thread) => thread.toJson()).toList(),
     'messageReports': messageReports.map((report) => report.toJson()).toList(),
+    'notifications': notifications
+        .map((notification) => notification.toJson())
+        .toList(),
     'activeCircleId': activeCircleId,
     'themePreference': themePreference.name,
     'selectedTab': selectedTab,
@@ -132,7 +140,9 @@ class AppState {
 
   factory AppState.fromJson(Map<String, dynamic> json) {
     final version = json['schemaVersion'];
-    if (version != 1 && version != 2 && version != 3) return const AppState();
+    if (version != 1 && version != 2 && version != 3 && version != 4) {
+      return const AppState();
+    }
     return AppState(
       onboardingComplete: json['onboardingComplete'] as bool? ?? false,
       selectedWorkplaceId: json['selectedWorkplaceId'] as String?,
@@ -193,7 +203,7 @@ class AppState {
                   ),
                 )
                 .toList(),
-      messageThreads: version == 3
+      messageThreads: version >= 3
           ? (json['messageThreads'] as List<dynamic>? ?? const [])
                 .map(
                   (thread) =>
@@ -201,11 +211,20 @@ class AppState {
                 )
                 .toList()
           : const [],
-      messageReports: version == 3
+      messageReports: version >= 3
           ? (json['messageReports'] as List<dynamic>? ?? const [])
                 .map(
                   (report) => MessageModerationReport.fromJson(
                     report as Map<String, dynamic>,
+                  ),
+                )
+                .toList()
+          : const [],
+      notifications: version >= 4
+          ? (json['notifications'] as List<dynamic>? ?? const [])
+                .map(
+                  (notification) => CommuteNotification.fromJson(
+                    notification as Map<String, dynamic>,
                   ),
                 )
                 .toList()

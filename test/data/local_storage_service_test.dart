@@ -3,6 +3,7 @@ import 'package:coleggo/data/models/cancellation_record.dart';
 import 'package:coleggo/data/models/app_state.dart';
 import 'package:coleggo/data/models/journey.dart';
 import 'package:coleggo/data/models/message_thread.dart';
+import 'package:coleggo/data/models/notification_record.dart';
 import 'package:coleggo/data/services/local_storage_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -131,6 +132,29 @@ void main() {
     expect(
       restored.messageReports.single.status,
       ModerationReportStatus.submitted,
+    );
+  });
+
+  test('restores in-app notification records', () async {
+    SharedPreferences.setMockInitialValues({});
+    final service = LocalStorageService(await SharedPreferences.getInstance());
+    final notification = CommuteNotification(
+      id: 'notification-1',
+      type: CommuteNotificationType.backupDriver,
+      title: 'Backup driver selected',
+      body: 'A replacement driver has been selected.',
+      createdAt: DateTime(2026, 7, 16, 21),
+      contextRoute: '/circles/circle-solihull-early',
+      priority: CommuteNotificationPriority.actionRequired,
+    );
+
+    await service.save(AppState(notifications: [notification]));
+    final restored = await service.load();
+
+    expect(restored.notifications.single.title, 'Backup driver selected');
+    expect(
+      restored.notifications.single.priority,
+      CommuteNotificationPriority.actionRequired,
     );
   });
 }

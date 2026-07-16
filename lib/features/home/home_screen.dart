@@ -50,6 +50,9 @@ class HomeScreen extends ConsumerWidget {
               request.isActive,
         )
         .length;
+    final unreadNotifications = state.notifications
+        .where((notification) => !notification.read)
+        .length;
     return Scaffold(
       appBar: AppBar(
         title: const Column(
@@ -66,6 +69,15 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: () => context.push('/notifications'),
+            icon: Badge.count(
+              count: unreadNotifications,
+              isLabelVisible: unreadNotifications > 0,
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            tooltip: 'Notifications',
+          ),
           IconButton(
             onPressed: () => context.push('/safety'),
             icon: const Icon(Icons.shield_outlined),

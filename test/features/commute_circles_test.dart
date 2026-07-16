@@ -113,6 +113,24 @@ void main() {
 
     expect(find.text('Can we meet by the station entrance?'), findsOneWidget);
   });
+
+  testWidgets('journey actions create readable in-app notifications', (
+    tester,
+  ) async {
+    await _pumpApp(tester, _state());
+
+    await tester.tap(find.text('Confirm'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Notifications'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Journey response saved'), findsOneWidget);
+    expect(find.text('Action'), findsOneWidget);
+    await tester.tap(find.text('Mark all read'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Journey response saved'), findsOneWidget);
+  });
 }
 
 Future<void> _pumpApp(WidgetTester tester, AppState state) async {

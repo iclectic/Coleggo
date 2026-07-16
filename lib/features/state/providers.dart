@@ -65,6 +65,10 @@ final messagingRepositoryProvider = Provider<MessagingRepository>(
   (ref) => MockMessagingRepository(),
 );
 
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (ref) => MockNotificationRepository(),
+);
+
 final appControllerProvider = NotifierProvider<AppController, AppState>(
   AppController.new,
 );

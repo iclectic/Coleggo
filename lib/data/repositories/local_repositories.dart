@@ -7,6 +7,7 @@ import '../models/commute_request.dart';
 import '../models/commuter_profile.dart';
 import '../models/journey.dart';
 import '../models/message_thread.dart';
+import '../models/notification_record.dart';
 import '../models/match_result.dart';
 import '../models/reliability_profile.dart';
 import '../models/ride_request.dart';
@@ -411,4 +412,48 @@ class MockMessagingRepository implements MessagingRepository {
       ),
     );
   }
+}
+
+class MockNotificationRepository implements NotificationRepository {
+  @override
+  Future<RepositoryResult<CommuteNotification>> create({
+    required CommuteNotificationType type,
+    required String title,
+    required String body,
+    required CommuteNotificationPriority priority,
+    String? contextRoute,
+  }) async => RepositoryResult.data(
+    CommuteNotification(
+      id: 'notification-${DateTime.now().microsecondsSinceEpoch}',
+      type: type,
+      title: title,
+      body: body,
+      createdAt: DateTime.now(),
+      contextRoute: contextRoute,
+      priority: priority,
+    ),
+  );
+
+  @override
+  Future<RepositoryResult<List<CommuteNotification>>> markRead({
+    required List<CommuteNotification> notifications,
+    required String notificationId,
+  }) async => RepositoryResult.data(
+    notifications
+        .map(
+          (notification) => notification.id == notificationId
+              ? notification.copyWith(read: true)
+              : notification,
+        )
+        .toList(),
+  );
+
+  @override
+  Future<RepositoryResult<List<CommuteNotification>>> markAllRead({
+    required List<CommuteNotification> notifications,
+  }) async => RepositoryResult.data(
+    notifications
+        .map((notification) => notification.copyWith(read: true))
+        .toList(),
+  );
 }
