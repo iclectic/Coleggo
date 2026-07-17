@@ -22,6 +22,35 @@ class RepositoryResult<T> {
   bool get hasError => errorMessage != null;
 }
 
+class AuthUser {
+  const AuthUser({required this.id, required this.email, this.profile});
+  final String id;
+  final String email;
+  final CommuterProfile? profile;
+}
+
+abstract interface class AuthRepository {
+  Future<RepositoryResult<AuthUser>> register({
+    required String email,
+    required String password,
+    required String firstName,
+    required String initials,
+    required String worksiteId,
+    required String homeArea,
+    required String corridor,
+    required Set<int> days,
+    required int arrivalMinutes,
+    required int departureMinutes,
+    required CommuterRole role,
+    int availableSeats,
+    String? vehicleSummary,
+  });
+  Future<RepositoryResult<AuthUser>> login(String email, String password);
+  Future<RepositoryResult<AuthUser>> currentUser();
+  Future<RepositoryResult<bool>> verifyWorkplaceEmail(String email);
+  Future<void> logout();
+}
+
 abstract interface class WorkplaceRepository {
   List<Workplace> getWorkplaces();
 }
