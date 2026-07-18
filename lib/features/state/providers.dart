@@ -17,6 +17,7 @@ import '../../data/services/token_storage_service.dart';
 import 'app_controller.dart';
 
 const _secureStorage = FlutterSecureStorage();
+const _useBackend = bool.fromEnvironment('COLEGGO_USE_BACKEND');
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError('SharedPreferences must be overridden'),
@@ -64,11 +65,15 @@ final rideRequestRepositoryProvider = Provider<RideRequestRepository>(
 );
 
 final commuteCircleRepositoryProvider = Provider<CommuteCircleRepository>(
-  (ref) => BackendCommuteCircleRepository(ref.watch(backendApiClientProvider)),
+  (ref) => _useBackend
+      ? BackendCommuteCircleRepository(ref.watch(backendApiClientProvider))
+      : MockCommuteCircleRepository(),
 );
 
 final journeyRepositoryProvider = Provider<JourneyRepository>(
-  (ref) => BackendJourneyRepository(ref.watch(backendApiClientProvider)),
+  (ref) => _useBackend
+      ? BackendJourneyRepository(ref.watch(backendApiClientProvider))
+      : MockJourneyRepository(),
 );
 
 final reliabilityRepositoryProvider = Provider<ReliabilityRepository>(
@@ -89,7 +94,9 @@ final messagingRepositoryProvider = Provider<MessagingRepository>(
 );
 
 final notificationRepositoryProvider = Provider<NotificationRepository>(
-  (ref) => BackendNotificationRepository(ref.watch(backendApiClientProvider)),
+  (ref) => _useBackend
+      ? BackendNotificationRepository(ref.watch(backendApiClientProvider))
+      : MockNotificationRepository(),
 );
 
 final appControllerProvider = NotifierProvider<AppController, AppState>(

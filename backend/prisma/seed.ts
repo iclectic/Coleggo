@@ -3,6 +3,20 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.$transaction([
+    prisma.cancellationRecord.deleteMany(),
+    prisma.attendance.deleteMany(),
+    prisma.journeyOccurrence.deleteMany(),
+    prisma.circleMembership.deleteMany(),
+    prisma.commuteRequest.deleteMany(),
+    prisma.commuteCircle.deleteMany(),
+    prisma.notification.deleteMany(),
+    prisma.profile.deleteMany(),
+    prisma.user.deleteMany(),
+    prisma.worksite.deleteMany(),
+    prisma.workplace.deleteMany(),
+  ]);
+
   const workplace = await prisma.workplace.create({
     data: { name: 'Northstar Works', slug: 'northstar', domain: 'northstar.example' },
   });
@@ -19,7 +33,7 @@ async function main() {
           passwordHash: 'not-used-for-seed',
         },
       },
-      worksiteId: worksite.id,
+      worksite: { connect: { id: worksite.id } },
       firstName: 'Asha',
       initials: 'AS',
       role: 'driver',
@@ -42,7 +56,7 @@ async function main() {
           passwordHash: 'not-used-for-seed',
         },
       },
-      worksiteId: worksite.id,
+      worksite: { connect: { id: worksite.id } },
       firstName: 'Ben',
       initials: 'BE',
       role: 'passenger',
