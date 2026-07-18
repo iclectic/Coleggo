@@ -1,10 +1,7 @@
 import 'package:dio/dio.dart';
 
-import '../models/commute_request.dart';
 import '../models/commuter_profile.dart';
 import '../models/notification_record.dart';
-import '../models/workplace.dart';
-import '../models/worksite.dart';
 import '../services/backend_api_client.dart';
 import 'repository_interfaces.dart';
 
@@ -118,17 +115,6 @@ class BackendAuthRepository implements AuthRepository {
       vehicleSummary: json['vehicleSummary'] as String?,
       verifiedWorkplace: true,
     );
-  }
-}
-
-class BackendWorkplaceRepository implements WorkplaceRepository {
-  BackendWorkplaceRepository(this._client);
-  final BackendApiClient _client;
-
-  @override
-  List<Workplace> getWorkplaces() {
-    // P1 backend does not expose workplace list; keep using local mock.
-    return [];
   }
 }
 

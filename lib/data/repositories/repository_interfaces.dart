@@ -41,7 +41,7 @@ abstract interface class AuthRepository {
     required Set<int> days,
     required int arrivalMinutes,
     required int departureMinutes,
-    required CommuterRole role,
+    required CommuteRole role,
     int availableSeats,
     String? vehicleSummary,
   });
