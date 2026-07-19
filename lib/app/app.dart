@@ -17,6 +17,7 @@ class ColeggoApp extends ConsumerStatefulWidget {
 
 class _ColeggoAppState extends ConsumerState<ColeggoApp> {
   GoRouter? _router;
+  String? _routerSignature;
 
   @override
   void dispose() {
@@ -42,7 +43,19 @@ class _ColeggoAppState extends ConsumerState<ColeggoApp> {
         home: const LaunchScreen(),
       );
     }
-    _router ??= createRouter(state);
+    final signature = [
+      state.onboardingComplete,
+      state.selectedWorkplaceId,
+      state.selectedWorksiteId,
+      state.workplaceVerified,
+      state.setupComplete,
+      state.selectedTab,
+    ].join('|');
+    if (_router == null || _routerSignature != signature) {
+      _router?.dispose();
+      _router = createRouter(state);
+      _routerSignature = signature;
+    }
     return MaterialApp.router(
       debugShowCheckedModeBanner: false,
       title: 'Coleggo',

@@ -46,7 +46,7 @@ void main() {
         recurring: true,
       ),
       requests: MockData.seededRequests(),
-      selectedTab: 2,
+      selectedTab: 3,
     );
     SharedPreferences.setMockInitialValues({
       LocalStorageService.stateKey: jsonEncode(state.toJson()),
@@ -66,6 +66,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('You’re travelling together'), findsOneWidget);
+    expect(find.text('Messaging'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Before you travel'), 220);
     expect(find.text('Before you travel'), findsOneWidget);
   });
 }

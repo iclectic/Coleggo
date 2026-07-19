@@ -1,0 +1,167 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  profile       Profile?
+  notifications Notification[]
+  commuteRequests CommuteRequest[]
+
+  @@map("users")
+}
+
+model Workplace {
+  id        String    @id @default(cuid())
+  name      String
+  slug      String    @unique
+  domain    String    @unique
+  createdAt DateTime  @default(now())
+  worksites Worksite[]
+
+  @@map("workplaces")
+}
+
+model Worksite {
+  id          String    @id @default(cuid())
+  workplaceId String
+  name        String
+  createdAt   DateTime  @default(now())
+  workplace   Workplace @relation(fields: [workplaceId], references: [id])
+  profiles    Profile[]
+  circles     CommuteCircle[]
+
+  @@unique([workplaceId, name])
+  @@map("worksites")
+}
+
+model Profile {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  worksiteId       String
+  firstName        String
+  initials         String
+  role             String
+  homeArea         String
+  corridor         String
+  days             Int[]
+  arrivalMinutes   Int
+  departureMinutes Int
+  availableSeats   Int       @default(0)
+  vehicleSummary   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  worksite         Worksite  @relation(fields: [worksiteId], references: [id])
+  memberships      CircleMembership[]
+  attendances      Attendance[]
+  cancellations    CancellationRecord[]
+
+  @@map("profiles")
+}
+
+model CommuteCircle {
+  id              String    @id @default(cuid())
+  worksiteId      String
+  name            String
+  shiftLabel      String
+  days            Int[]
+  departureWindow String
+  seats           Int
+  state           String    @default("active")
+  createdAt       DateTime  @default(now())
+  worksite        Worksite  @relation(fields: [worksiteId], references: [id])
+  memberships     CircleMembership[]
+  requests        CommuteRequest[]
+  journeys        JourneyOccurrence[]
+
+  @@map("commute_circles")
+}
+
+model CircleMembership {
+  id        String        @id @default(cuid())
+  circleId  String
+  profileId String
+  role      String
+  joinedAt  DateTime      @default(now())
+  circle    CommuteCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  profile   Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([circleId, profileId])
+  @@map("circle_memberships")
+}
+
+model CommuteRequest {
+  id          String        @id @default(cuid())
+  circleId    String
+  requesterId String
+  type        String
+  status      String        @default("pending")
+  message     String?
+  createdAt   DateTime      @default(now())
+  circle      CommuteCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  requester   User          @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@map("commute_requests")
+}
+
+model JourneyOccurrence {
+  id                String       @id @default(cuid())
+  circleId          String
+  scheduledFor      DateTime
+  state             String       @default("scheduled")
+  driverId          String?
+  createdAt         DateTime     @default(now())
+  circle            CommuteCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  attendances       Attendance[]
+  cancellations     CancellationRecord[]
+
+  @@map("journey_occurrences")
+}
+
+model Attendance {
+  id        String            @id @default(cuid())
+  journeyId String
+  profileId String
+  status    String
+  journey   JourneyOccurrence @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  profile   Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([journeyId, profileId])
+  @@map("attendances")
+}
+
+model CancellationRecord {
+  id                 String            @id @default(cuid())
+  journeyId          String
+  cancelledById      String
+  reason             String
+  affectedPassengers Int
+  createdAt          DateTime          @default(now())
+  journey            JourneyOccurrence @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  cancelledBy        Profile           @relation(fields: [cancelledById], references: [id], onDelete: Cascade)
+
+  @@map("cancellation_records")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}

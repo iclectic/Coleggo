@@ -7,6 +7,9 @@ import '../../core/utils/formatters.dart';
 import '../../core/widgets/compatibility_indicator.dart';
 import '../../core/widgets/profile_avatar.dart';
 import '../../data/mock/mock_data.dart';
+import '../../data/models/commute_circle.dart';
+import '../../data/models/commute_request.dart';
+import '../../data/models/journey.dart';
 import '../../data/models/ride_request.dart';
 import '../state/providers.dart';
 
@@ -20,6 +23,15 @@ class HomeScreen extends ConsumerWidget {
     final commute = state.commute!;
     final worksite = MockData.worksite(commute.worksiteId);
     final matches = ref.watch(matchesProvider);
+    final activeCircle = state.circles
+        .where((circle) => circle.id == state.activeCircleId)
+        .firstOrNull;
+    final nextJourney = activeCircle == null
+        ? null
+        : state.journeys
+              .where((journey) => journey.circleId == activeCircle.id)
+              .firstOrNull;
+    final reliability = state.reliabilityProfiles.firstOrNull;
     final accepted = state.requests
         .where((item) => item.status == RequestStatus.accepted)
         .length;
@@ -29,6 +41,17 @@ class HomeScreen extends ConsumerWidget {
               item.direction == RequestDirection.incoming &&
               item.status == RequestStatus.pending,
         )
+        .length;
+    final circleJoinRequests = state.commuteRequests
+        .where(
+          (request) =>
+              request.type == CommuteRequestType.joinCircle &&
+              request.status == CommuteRequestStatus.pending &&
+              request.isActive,
+        )
+        .length;
+    final unreadNotifications = state.notifications
+        .where((notification) => !notification.read)
         .length;
     return Scaffold(
       appBar: AppBar(
@@ -46,6 +69,15 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: () => context.push('/notifications'),
+            icon: Badge.count(
+              count: unreadNotifications,
+              isLabelVisible: unreadNotifications > 0,
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            tooltip: 'Notifications',
+          ),
           IconButton(
             onPressed: () => context.push('/safety'),
             icon: const Icon(Icons.shield_outlined),
@@ -68,60 +100,52 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              const Text('Here is how your work week is coming together.'),
+              const Text('Your private workplace commute network.'),
               const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(22),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Theme.of(context).colorScheme.primary,
-                      Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: .76),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.repeat_rounded, color: Colors.white),
-                        SizedBox(width: 8),
-                        Text(
-                          'YOUR RECURRING COMMUTE',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: .7,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 22),
-                    Text(
-                      '${profile.homeArea}  →  ${worksite.name}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${formatDays(commute.days)} · Arrive ${formatMinutes(commute.arrivalMinutes)} · Leave ${formatMinutes(commute.departureMinutes)}',
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 18),
-                    FilledButton.tonalIcon(
-                      onPressed: () => context.push('/commute/edit'),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Edit commute'),
-                    ),
-                  ],
-                ),
+              _NextJourneyCard(
+                circle: activeCircle,
+                journey: nextJourney,
+                worksiteName: worksite.name,
+                fallback:
+                    '${profile.homeArea} to ${worksite.name} · ${formatDays(commute.days)}',
               ),
+              const SizedBox(height: 16),
+              _ActionCentre(
+                pendingIncoming: pendingIncoming,
+                circleJoinRequests: circleJoinRequests,
+                journey: nextJourney,
+              ),
+              const SizedBox(height: 16),
+              if (activeCircle != null)
+                Card(
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.groups_2_outlined),
+                    ),
+                    title: Text(activeCircle.name),
+                    subtitle: Text(
+                      '${formatDays(activeCircle.days)} · ${activeCircle.availableSeats} seat remaining',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_rounded),
+                    onTap: () => context.push('/circles/${activeCircle.id}'),
+                  ),
+                )
+              else
+                Card(
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(16),
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.groups_2_outlined),
+                    ),
+                    title: const Text('No active Commute Circle yet'),
+                    subtitle: const Text(
+                      'Start with one of your strongest colleague matches.',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_rounded),
+                    onTap: () => context.go('/circles'),
+                  ),
+                ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -137,8 +161,8 @@ class HomeScreen extends ConsumerWidget {
                   Expanded(
                     child: _StatCard(
                       icon: Icons.mark_email_unread_outlined,
-                      value: '$pendingIncoming',
-                      label: 'incoming requests',
+                      value: '${pendingIncoming + circleJoinRequests}',
+                      label: 'requests to review',
                       onTap: () => context.go('/requests'),
                     ),
                   ),
@@ -202,8 +226,167 @@ class HomeScreen extends ConsumerWidget {
                     onTap: () => context.push('/matches/${match.profile.id}'),
                   ),
                 ),
+              const SizedBox(height: 16),
+              if (reliability != null)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your reliability summary',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 10),
+                        for (final signal in reliability.positives.take(3))
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_rounded, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(child: Text(signal.label)),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Workplace verification does not confirm driving ability, insurance, criminal history or personal character.',
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NextJourneyCard extends StatelessWidget {
+  const _NextJourneyCard({
+    required this.circle,
+    required this.journey,
+    required this.worksiteName,
+    required this.fallback,
+  });
+
+  final CommuteCircle? circle;
+  final JourneyOccurrence? journey;
+  final String worksiteName;
+  final String fallback;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.event_available_outlined),
+              const SizedBox(width: 8),
+              Text(
+                'Next journey',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            circle?.name ?? fallback,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            journey == null
+                ? worksiteName
+                : '${formatMinutes(journey!.departureWindowStartMinutes)} to ${formatMinutes(journey!.departureWindowEndMinutes)} · $worksiteName',
+          ),
+          if (journey != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${journey!.confirmedCount} of ${journey!.memberIds.length} members confirmed for tomorrow',
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+class _ActionCentre extends ConsumerWidget {
+  const _ActionCentre({
+    required this.pendingIncoming,
+    required this.circleJoinRequests,
+    required this.journey,
+  });
+
+  final int pendingIncoming;
+  final int circleJoinRequests;
+  final JourneyOccurrence? journey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final needsConfirmation =
+        journey?.attendance.any(
+          (item) =>
+              item.profileId == ref.watch(appControllerProvider).profile?.id &&
+              item.status == JourneyAttendanceStatus.confirmed,
+        ) ==
+        false;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Action centre',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            if (journey != null && needsConfirmation)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.fact_check_outlined),
+                title: const Text('Confirm tomorrow’s journey'),
+                trailing: FilledButton(
+                  onPressed: () => ref
+                      .read(appControllerProvider.notifier)
+                      .setJourneyAttendance(
+                        journey!.id,
+                        JourneyAttendanceStatus.confirmed,
+                      ),
+                  child: const Text('Confirm'),
+                ),
+              ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.inbox_outlined),
+              title: Text(
+                pendingIncoming + circleJoinRequests == 0
+                    ? 'No requests waiting'
+                    : 'Respond to ${pendingIncoming + circleJoinRequests} requests',
+              ),
+              onTap: () => context.go('/requests'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.edit_calendar_outlined),
+              title: const Text('Keep your Friday schedule up to date'),
+              onTap: () => context.push('/commute/edit'),
+            ),
+          ],
         ),
       ),
     );
