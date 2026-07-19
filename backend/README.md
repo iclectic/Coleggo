@@ -22,7 +22,7 @@ cp .env.example .env
 2. Start PostgreSQL:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 3. Install dependencies and generate the Prisma client:
@@ -67,13 +67,14 @@ See `.env.example` for required values.
 - `JWT_SECRET` - Secret used to sign and verify JWTs. **Must be long and random in production.**
 - `PORT` - Port the Express server binds to (default `3000`)
 - `NODE_ENV` - `development` or `production`
+- `CORS_ORIGIN` - Allowed web application origin. Required in production.
 
 ## Security notes
 
 - JWTs expire after 7 days in development. Reduce this in production.
+- The API refuses to start in production without a unique `JWT_SECRET` of at least 32 characters and an explicit `CORS_ORIGIN`.
 - The seed script creates mock users and should only be used in development.
 - `bcrypt` is used for password hashing.
-- CORS is enabled for all origins in development. Restrict this for staging and production.
 
 ## API overview
 

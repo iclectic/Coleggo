@@ -20,7 +20,39 @@ class AppController extends Notifier<AppState> {
 
   Future<void> _restore() async {
     final restored = await ref.read(commuteRepositoryProvider).loadState();
-    state = restored.copyWith(isLoading: false);
+    var next = restored.copyWith(isLoading: false);
+    if (ref.read(backendModeEnabledProvider) &&
+        next.profile != null &&
+        next.commute != null) {
+      final token = await ref.read(tokenStorageServiceProvider).readToken();
+      if (token != null && token.isNotEmpty) {
+        final result = await ref
+            .read(authRepositoryProvider)
+            .migrateLocalState(next);
+        if (result.hasError || result.value == null) {
+          next = next.copyWith(
+            errorMessage: result.errorMessage ??
+                'Your local commute data could not be moved to the server.',
+          );
+        }
+      }
+    }
+    state = next;
+  }
+
+  Future<bool> migrateLocalStateToBackend() async {
+    if (!ref.read(backendModeEnabledProvider)) return false;
+    final result = await ref
+        .read(authRepositoryProvider)
+        .migrateLocalState(state);
+    if (result.hasError || result.value == null) {
+      state = state.copyWith(
+        errorMessage: result.errorMessage ??
+            'Your local commute data could not be moved to the server.',
+      );
+      return false;
+    }
+    return true;
   }
 
   Future<void> _setAndPersist(AppState next) async {

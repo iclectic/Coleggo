@@ -4,7 +4,11 @@ import 'package:coleggo/data/models/commute_circle.dart';
 import 'package:coleggo/data/models/commute_request.dart';
 import 'package:coleggo/data/models/commuter_profile.dart';
 import 'package:coleggo/data/models/workplace_verification.dart';
+import 'package:coleggo/data/repositories/backend_circle_repository.dart';
 import 'package:coleggo/data/repositories/local_repositories.dart';
+import 'package:coleggo/data/services/backend_api_client.dart';
+import 'package:coleggo/data/services/token_storage_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -91,6 +95,32 @@ void main() {
       );
       expect(updated.availableSeats, circle.availableSeats - 1);
       expect(updated.state, CommuteCircleState.full);
+    },
+  );
+
+  test(
+    'backend circle repository rejects pause and leave as unsupported',
+    () async {
+      final client = BackendApiClient(
+        tokenStorage: const TokenStorageService(FlutterSecureStorage()),
+      );
+      final repository = BackendCommuteCircleRepository(client);
+      final circle = MockData.commuteCircles().first;
+
+      final pause = await repository.pauseParticipation(
+        circles: [circle],
+        circleId: circle.id,
+        profileId: 'p1',
+        paused: true,
+      );
+      final leave = await repository.leaveCircle(
+        circles: [circle],
+        circleId: circle.id,
+        profileId: 'p1',
+      );
+
+      expect(pause.hasError, isTrue);
+      expect(leave.hasError, isTrue);
     },
   );
 }

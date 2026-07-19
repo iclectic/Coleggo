@@ -48,6 +48,7 @@ abstract interface class AuthRepository {
   Future<RepositoryResult<AuthUser>> login(String email, String password);
   Future<RepositoryResult<AuthUser>> currentUser();
   Future<RepositoryResult<bool>> verifyWorkplaceEmail(String email);
+  Future<RepositoryResult<AuthUser>> migrateLocalState(AppState localState);
   Future<void> logout();
 }
 
