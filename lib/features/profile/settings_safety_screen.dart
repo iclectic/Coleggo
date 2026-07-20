@@ -10,6 +10,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final preference = ref.watch(appControllerProvider).themePreference;
+    final backendModeEnabled = ref.watch(backendModeEnabledProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -88,6 +89,25 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                   onTap: () => _confirmReset(context, ref),
                 ),
+                if (backendModeEnabled) ...[
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(
+                      Icons.delete_forever_outlined,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    title: Text(
+                      'Delete account',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Permanently delete your server account and its data',
+                    ),
+                    onTap: () => _confirmAccountDeletion(context, ref),
+                  ),
+                ],
               ],
             ),
           ),
@@ -121,6 +141,53 @@ class SettingsScreen extends ConsumerWidget {
     if (!reset) return;
     await ref.read(appControllerProvider.notifier).reset();
     if (context.mounted) context.go('/onboarding');
+  }
+
+  Future<void> _confirmAccountDeletion(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final delete = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Delete your account?'),
+            content: const Text(
+              'This permanently deletes your server account, profile, memberships, requests, journeys and notifications. This cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete account'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!delete) return;
+
+    final deleted = await ref
+        .read(appControllerProvider.notifier)
+        .deleteAccount();
+    if (!context.mounted) return;
+    if (deleted) {
+      context.go('/onboarding');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your account has been deleted.')),
+      );
+      return;
+    }
+    final error = ref.read(appControllerProvider).errorMessage;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(error ?? 'Your account could not be deleted.')),
+    );
   }
 }
 

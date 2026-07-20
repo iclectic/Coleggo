@@ -27,6 +27,33 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const migrateSchema = z.object({
+  profile: z.object({
+    firstName: z.string().min(1),
+    initials: z.string().min(1).max(3),
+    homeArea: z.string().min(1),
+    corridor: z.string().min(1),
+    days: z.array(z.number().int().min(1).max(7)),
+    arrivalMinutes: z.number().int(),
+    departureMinutes: z.number().int(),
+    role: z.enum(['driver', 'passenger', 'both']),
+    availableSeats: z.number().int().default(0),
+    vehicleSummary: z.string().optional(),
+  }).optional(),
+  commute: z.object({
+    days: z.array(z.number().int().min(1).max(7)),
+    arrivalMinutes: z.number().int(),
+    departureMinutes: z.number().int(),
+  }).optional(),
+  circles: z.array(z.object({
+    name: z.string().min(1),
+    shiftLabel: z.string().default('standardOffice'),
+    days: z.array(z.number().int().min(1).max(7)),
+    departureWindow: z.string().default('07:00-09:00'),
+    seats: z.number().int().default(0),
+  })).default([]),
+});
+
 router.post('/register', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -123,6 +150,115 @@ router.post('/verify-workplace', requireAuth, async (req: AuthRequest, res) => {
     message: matches
       ? 'Workplace domain matched. This confirms access to a workplace email, not driving ability, insurance, criminal history or personal character.'
       : 'Email domain does not match the selected workplace.',
+  });
+});
+
+router.delete('/account', requireAuth, async (req: AuthRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.userId },
+    include: { profile: { include: { memberships: { select: { circleId: true } } } } },
+  });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  const circleIds = user.profile?.memberships.map((membership) => membership.circleId) ?? [];
+  await prisma.$transaction(async (transaction) => {
+    await transaction.user.delete({ where: { id: user.id } });
+    for (const circleId of circleIds) {
+      const memberCount = await transaction.circleMembership.count({
+        where: { circleId },
+      });
+      if (memberCount === 0) {
+        await transaction.commuteCircle.delete({ where: { id: circleId } });
+      }
+    }
+  });
+  res.status(204).send();
+});
+
+router.post('/migrate', requireAuth, async (req: AuthRequest, res) => {
+  const parsed = migrateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid migration data', issues: parsed.error.flatten() });
+    return;
+  }
+  const data = parsed.data;
+  const user = await prisma.user.findUnique({
+    where: { id: req.userId },
+    include: { profile: { include: { worksite: true } } },
+  });
+  if (!user?.profile) {
+    res.status(404).json({ error: 'Profile not found' });
+    return;
+  }
+
+  const profile = user.profile;
+  const role = data.profile?.role ?? profile.role;
+  const days = data.profile?.days ?? data.commute?.days ?? profile.days;
+  const arrivalMinutes = data.profile?.arrivalMinutes ?? data.commute?.arrivalMinutes ?? profile.arrivalMinutes;
+  const departureMinutes = data.profile?.departureMinutes ?? data.commute?.departureMinutes ?? profile.departureMinutes;
+
+  await prisma.profile.update({
+    where: { id: profile.id },
+    data: {
+      firstName: data.profile?.firstName ?? profile.firstName,
+      initials: data.profile?.initials ?? profile.initials,
+      homeArea: data.profile?.homeArea ?? profile.homeArea,
+      corridor: data.profile?.corridor ?? profile.corridor,
+      days,
+      arrivalMinutes,
+      departureMinutes,
+      role,
+      availableSeats: data.profile?.availableSeats ?? profile.availableSeats,
+      vehicleSummary: data.profile?.vehicleSummary ?? profile.vehicleSummary,
+    },
+  });
+
+  let circlesCreated = 0;
+  let membershipsCreated = 0;
+
+  for (const localCircle of data.circles) {
+    const existing = await prisma.commuteCircle.findFirst({
+      where: { worksiteId: profile.worksiteId, name: localCircle.name },
+    });
+    if (existing) continue;
+    const circle = await prisma.commuteCircle.create({
+      data: {
+        worksiteId: profile.worksiteId,
+        name: localCircle.name,
+        shiftLabel: localCircle.shiftLabel,
+        days: localCircle.days,
+        departureWindow: localCircle.departureWindow,
+        seats: localCircle.seats,
+        state: 'active',
+      },
+    });
+    circlesCreated += 1;
+    const alreadyMember = await prisma.circleMembership.findUnique({
+      where: { circleId_profileId: { circleId: circle.id, profileId: profile.id } },
+    });
+    if (!alreadyMember) {
+      await prisma.circleMembership.create({
+        data: {
+          circleId: circle.id,
+          profileId: profile.id,
+          role: 'organiser',
+        },
+      });
+      membershipsCreated += 1;
+    }
+  }
+
+  const updated = await prisma.user.findUnique({
+    where: { id: req.userId },
+    include: { profile: { include: { worksite: { include: { workplace: true } } } } },
+  });
+  res.json({
+    migrated: true,
+    circlesCreated,
+    membershipsCreated,
+    user: toUserDto(updated!),
   });
 });
 

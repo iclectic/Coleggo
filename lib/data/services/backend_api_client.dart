@@ -5,7 +5,10 @@ import 'token_storage_service.dart';
 class BackendApiClient {
   BackendApiClient({
     required TokenStorageService tokenStorage,
-    String baseUrl = 'http://localhost:3000',
+    String baseUrl = const String.fromEnvironment(
+      'COLEGGO_API_BASE_URL',
+      defaultValue: 'http://localhost:3000',
+    ),
   })  : _tokenStorage = tokenStorage,
         _dio = Dio(
           BaseOptions(
@@ -47,6 +50,10 @@ class BackendApiClient {
 
   Future<Response<T>> post<T>(String path, {Object? data}) async {
     return _dio.post<T>(path, data: data);
+  }
+
+  Future<Response<T>> delete<T>(String path) async {
+    return _dio.delete<T>(path);
   }
 }
 

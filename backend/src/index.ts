@@ -5,9 +5,11 @@ import authRoutes from './routes/auth';
 import circleRoutes from './routes/circles';
 import journeyRoutes from './routes/journeys';
 import notificationRoutes from './routes/notifications';
+import { getRuntimeConfig } from './lib/runtimeConfig';
 
+const { corsOrigin } = getRuntimeConfig();
 const app = express();
-app.use(cors());
+app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
 app.get('/health', (_req, res) => {

@@ -19,6 +19,8 @@ import 'app_controller.dart';
 const _secureStorage = FlutterSecureStorage();
 const _useBackend = bool.fromEnvironment('COLEGGO_USE_BACKEND');
 
+final backendModeEnabledProvider = Provider<bool>((ref) => _useBackend);
+
 final sharedPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError('SharedPreferences must be overridden'),
 );

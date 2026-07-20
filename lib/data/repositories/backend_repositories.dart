@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/app_state.dart';
 import '../models/commuter_profile.dart';
 import '../models/notification_record.dart';
 import '../services/backend_api_client.dart';
@@ -79,6 +80,78 @@ class BackendAuthRepository implements AuthRepository {
     try {
       final response = await _client.post<Map<String, dynamic>>('/auth/verify-workplace', data: {'email': email});
       return RepositoryResult.data(response.data!['verified'] as bool);
+    } on DioException catch (e) {
+      return RepositoryResult.failure(handleDioError(e));
+    }
+  }
+
+  @override
+  Future<RepositoryResult<AuthUser>> migrateLocalState(AppState localState) async {
+    final profile = localState.profile;
+    final commute = localState.commute;
+    if (profile == null || commute == null) {
+      return const RepositoryResult.failure(
+        'No local profile or commute to migrate.',
+      );
+    }
+    final payload = {
+      'profile': {
+        'firstName': profile.firstName,
+        'initials': profile.initials,
+        'homeArea': profile.homeArea,
+        'corridor': profile.corridor,
+        'days': profile.days.toList(),
+        'arrivalMinutes': profile.arrivalMinutes,
+        'departureMinutes': profile.departureMinutes,
+        'role': profile.role.name,
+        'availableSeats': profile.availableSeats,
+        'vehicleSummary': profile.vehicleSummary,
+      },
+      'commute': {
+        'days': commute.days.toList(),
+        'arrivalMinutes': commute.arrivalMinutes,
+        'departureMinutes': commute.departureMinutes,
+      },
+      'circles': localState.circles
+          .map(
+            (circle) => {
+              'name': circle.name,
+              'shiftLabel': circle.shiftPattern.kind.name,
+              'days': circle.days.toList(),
+              'departureWindow': _formatWindow(
+                circle.departureWindowStartMinutes,
+                circle.departureWindowEndMinutes,
+              ),
+              'seats': circle.availableSeats,
+            },
+          )
+          .toList(),
+    };
+    try {
+      final response = await _client.post<Map<String, dynamic>>(
+        '/auth/migrate',
+        data: payload,
+      );
+      return RepositoryResult.data(
+        _mapAuthUser(response.data!['user'] as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      return RepositoryResult.failure(handleDioError(e));
+    }
+  }
+
+  String _formatWindow(int startMinutes, int endMinutes) {
+    String two(int value) => value.toString().padLeft(2, '0');
+    return '${two(startMinutes ~/ 60)}:${two(startMinutes % 60)}-'
+        '${two(endMinutes ~/ 60)}:${two(endMinutes % 60)}';
+  }
+
+  @override
+  Future<RepositoryResult<void>> deleteAccount() async {
+    try {
+      await _client.delete<void>('/auth/account');
+      await _client.clearToken();
+      return const RepositoryResult.data(null);
     } on DioException catch (e) {
       return RepositoryResult.failure(handleDioError(e));
     }
