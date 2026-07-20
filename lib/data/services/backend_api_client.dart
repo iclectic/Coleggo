@@ -51,6 +51,10 @@ class BackendApiClient {
   Future<Response<T>> post<T>(String path, {Object? data}) async {
     return _dio.post<T>(path, data: data);
   }
+
+  Future<Response<T>> delete<T>(String path) async {
+    return _dio.delete<T>(path);
+  }
 }
 
 class ApiException implements Exception {

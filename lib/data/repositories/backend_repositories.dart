@@ -147,6 +147,17 @@ class BackendAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<RepositoryResult<void>> deleteAccount() async {
+    try {
+      await _client.delete<void>('/auth/account');
+      await _client.clearToken();
+      return const RepositoryResult.data(null);
+    } on DioException catch (e) {
+      return RepositoryResult.failure(handleDioError(e));
+    }
+  }
+
+  @override
   Future<void> logout() => _client.clearToken();
 
   AuthUser _mapAuthUser(Map<String, dynamic> json) {

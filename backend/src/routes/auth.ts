@@ -153,6 +153,30 @@ router.post('/verify-workplace', requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
+router.delete('/account', requireAuth, async (req: AuthRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.userId },
+    include: { profile: { include: { memberships: { select: { circleId: true } } } } },
+  });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  const circleIds = user.profile?.memberships.map((membership) => membership.circleId) ?? [];
+  await prisma.$transaction(async (transaction) => {
+    await transaction.user.delete({ where: { id: user.id } });
+    for (const circleId of circleIds) {
+      const memberCount = await transaction.circleMembership.count({
+        where: { circleId },
+      });
+      if (memberCount === 0) {
+        await transaction.commuteCircle.delete({ where: { id: circleId } });
+      }
+    }
+  });
+  res.status(204).send();
+});
+
 router.post('/migrate', requireAuth, async (req: AuthRequest, res) => {
   const parsed = migrateSchema.safeParse(req.body);
   if (!parsed.success) {

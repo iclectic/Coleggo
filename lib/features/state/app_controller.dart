@@ -597,5 +597,18 @@ class AppController extends Notifier<AppState> {
     state = const AppState();
   }
 
+  Future<bool> deleteAccount() async {
+    if (!ref.read(backendModeEnabledProvider)) return false;
+    final result = await ref.read(authRepositoryProvider).deleteAccount();
+    if (result.hasError) {
+      state = state.copyWith(
+        errorMessage: result.errorMessage ?? 'Your account could not be deleted.',
+      );
+      return false;
+    }
+    await reset();
+    return true;
+  }
+
   void dismissError() => state = state.copyWith(clearError: true);
 }
