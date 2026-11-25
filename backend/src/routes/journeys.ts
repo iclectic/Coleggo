@@ -1,5 +1,8 @@
+import { AttendanceStatus, JourneyState, MembershipRole } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
+import { withIdempotency } from '../lib/idempotency';
+import { assertTransition } from '../lib/journeyStates';
 import { prisma } from '../lib/prisma';
 import { paramId, requireAuth, type AuthRequest } from '../middleware/auth';
 
@@ -20,10 +23,13 @@ router.get('/next', requireAuth, async (req: AuthRequest, res) => {
     return;
   }
   const journey = await prisma.journeyOccurrence.findFirst({
-    where: { circleId: membership.circleId, state: { in: ['scheduled', 'awaitingConfirmation', 'confirmed'] } },
+    where: {
+      circleId: membership.circleId,
+      state: { in: [JourneyState.scheduled, JourneyState.awaitingConfirmation, JourneyState.confirmed] },
+    },
     orderBy: { scheduledFor: 'asc' },
     include: {
-      circle: true,
+      circle: { include: { memberships: true } },
       attendances: { include: { profile: true } },
       cancellations: true,
     },
@@ -35,7 +41,7 @@ router.get('/next', requireAuth, async (req: AuthRequest, res) => {
   res.json({ journey: toJourneyDto(journey, profile.id) });
 });
 
-router.post('/:id/confirm', requireAuth, async (req: AuthRequest, res) => {
+router.post('/:id/confirm', requireAuth, withIdempotency, async (req: AuthRequest, res) => {
   const id = paramId(req, 'id');
   if (!id) { res.status(400).json({ error: 'Invalid id' }); return; }
   const schema = z.object({ status: z.enum(['travelling', 'notTravelling', 'unsure']) });
@@ -49,16 +55,43 @@ router.post('/:id/confirm', requireAuth, async (req: AuthRequest, res) => {
     res.status(404).json({ error: 'Profile not found' });
     return;
   }
+  const journey = await prisma.journeyOccurrence.findUnique({ where: { id } });
+  if (!journey) {
+    res.status(404).json({ error: 'Journey not found' });
+    return;
+  }
+  if (
+    journey.state !== JourneyState.scheduled
+    && journey.state !== JourneyState.awaitingConfirmation
+    && journey.state !== JourneyState.confirmed
+  ) {
+    res.status(400).json({ error: 'Journey cannot be confirmed in its current state' });
+    return;
+  }
+
   const attendance = await prisma.attendance.upsert({
     where: { journeyId_profileId: { journeyId: id, profileId: profile.id } },
     create: { journeyId: id, profileId: profile.id, status: parsed.data.status },
     update: { status: parsed.data.status },
     include: { journey: { include: { circle: true } } },
   });
+
+  if (journey.state === JourneyState.scheduled || journey.state === JourneyState.awaitingConfirmation) {
+    try {
+      assertTransition(journey.state, JourneyState.confirmed);
+      await prisma.journeyOccurrence.update({
+        where: { id },
+        data: { state: JourneyState.confirmed },
+      });
+    } catch {
+      // Keep existing state if transition is not allowed.
+    }
+  }
+
   res.json({ attendance });
 });
 
-router.post('/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
+router.post('/:id/cancel', requireAuth, withIdempotency, async (req: AuthRequest, res) => {
   const id = paramId(req, 'id');
   if (!id) { res.status(400).json({ error: 'Invalid id' }); return; }
   const schema = z.object({ reason: z.string().min(1) });
@@ -72,12 +105,27 @@ router.post('/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
     res.status(404).json({ error: 'Profile not found' });
     return;
   }
+  const existing = await prisma.journeyOccurrence.findUnique({ where: { id } });
+  if (!existing) {
+    res.status(404).json({ error: 'Journey not found' });
+    return;
+  }
+  try {
+    assertTransition(existing.state, JourneyState.cancelled);
+  } catch {
+    res.status(400).json({ error: `Cannot cancel journey from state ${existing.state}` });
+    return;
+  }
+
   const journey = await prisma.journeyOccurrence.update({
     where: { id },
-    data: { state: 'cancelled' },
-    include: { attendances: true, circle: { include: { memberships: { include: { profile: true } } } } },
+    data: { state: JourneyState.cancelled },
+    include: {
+      attendances: true,
+      circle: { include: { memberships: { include: { profile: true } } } },
+    },
   });
-  const affected = journey.attendances.filter((a: any) => a.status === 'travelling').length;
+  const affected = journey.attendances.filter((a) => a.status === AttendanceStatus.travelling).length;
   await prisma.cancellationRecord.create({
     data: {
       journeyId: journey.id,
@@ -86,10 +134,26 @@ router.post('/:id/cancel', requireAuth, async (req: AuthRequest, res) => {
       affectedPassengers: affected,
     },
   });
-  res.json({ journey, affectedPassengers: affected });
+
+  const backupCandidates = journey.circle.memberships
+    .filter((member) => member.profileId !== profile.id)
+    .filter((member) => member.role === MembershipRole.driver
+      || member.role === MembershipRole.backupDriver
+      || member.role === MembershipRole.organiser
+      || member.profile.role === 'driver'
+      || member.profile.role === 'both')
+    .map((member) => ({
+      id: member.profile.id,
+      firstName: member.profile.firstName,
+      initials: member.profile.initials,
+      role: member.role,
+      availableSeats: member.profile.availableSeats,
+    }));
+
+  res.json({ journey, affectedPassengers: affected, backupCandidates });
 });
 
-router.post('/:id/backup', requireAuth, async (req: AuthRequest, res) => {
+router.post('/:id/backup', requireAuth, withIdempotency, async (req: AuthRequest, res) => {
   const id = paramId(req, 'id');
   if (!id) { res.status(400).json({ error: 'Invalid id' }); return; }
   const schema = z.object({ driverProfileId: z.string() });
@@ -98,17 +162,27 @@ router.post('/:id/backup', requireAuth, async (req: AuthRequest, res) => {
     res.status(400).json({ error: 'Invalid driver' });
     return;
   }
-  const cancelled = await prisma.journeyOccurrence.findUnique({ where: { id } });
-  if (!cancelled || cancelled.state !== 'cancelled') {
+  const cancelled = await prisma.journeyOccurrence.findUnique({
+    where: { id },
+    include: { circle: { include: { memberships: true } } },
+  });
+  if (!cancelled || cancelled.state !== JourneyState.cancelled) {
     res.status(400).json({ error: 'Journey is not cancelled' });
     return;
   }
   const replacement = await prisma.journeyOccurrence.create({
     data: {
       circleId: cancelled.circleId,
-      scheduledFor: cancelled.scheduledFor,
-      state: 'scheduled',
+      // Offset by 1 minute to satisfy unique(circleId, scheduledFor) while keeping same day.
+      scheduledFor: new Date(cancelled.scheduledFor.getTime() + 60 * 1000),
+      state: JourneyState.scheduled,
       driverId: parsed.data.driverProfileId,
+      attendances: {
+        create: cancelled.circle.memberships.map((member) => ({
+          profileId: member.profileId,
+          status: AttendanceStatus.unsure,
+        })),
+      },
     },
     include: { circle: true },
   });
@@ -116,7 +190,9 @@ router.post('/:id/backup', requireAuth, async (req: AuthRequest, res) => {
 });
 
 function toJourneyDto(journey: any, currentProfileId: string) {
-  const confirmed = journey.attendances.filter((a: any) => a.status === 'travelling').length;
+  const confirmed = journey.attendances.filter(
+    (a: any) => a.status === AttendanceStatus.travelling,
+  ).length;
   const total = journey.circle.memberships?.length ?? journey.attendances.length;
   const myAttendance = journey.attendances.find((a: any) => a.profileId === currentProfileId);
   return {

@@ -43,7 +43,7 @@ class BackendAuthRepository implements AuthRepository {
         'vehicleSummary': vehicleSummary,
       });
       final data = response.data!;
-      await _client.saveToken(data['token'] as String);
+      await _saveAuthTokens(data);
       return RepositoryResult.data(_mapAuthUser(data['user'] as Map<String, dynamic>));
     } on DioException catch (e) {
       return RepositoryResult.failure(handleDioError(e));
@@ -58,10 +58,19 @@ class BackendAuthRepository implements AuthRepository {
         'password': password,
       });
       final data = response.data!;
-      await _client.saveToken(data['token'] as String);
+      await _saveAuthTokens(data);
       return RepositoryResult.data(_mapAuthUser(data['user'] as Map<String, dynamic>));
     } on DioException catch (e) {
       return RepositoryResult.failure(handleDioError(e));
+    }
+  }
+
+  Future<void> _saveAuthTokens(Map<String, dynamic> data) async {
+    final access = (data['accessToken'] as String?) ?? (data['token'] as String);
+    await _client.saveToken(access);
+    final refresh = data['refreshToken'] as String?;
+    if (refresh != null && refresh.isNotEmpty) {
+      await _client.saveRefreshToken(refresh);
     }
   }
 

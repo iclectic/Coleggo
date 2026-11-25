@@ -28,4 +28,8 @@ The product supports early, late, night, standard and custom shifts, including o
 
 ## Why No Fare Marketplace
 
-The initial product focuses on workplace trust, recurring patterns, privacy and dependable planning. Payments, fares, driver earnings and marketplace mechanics are intentionally postponed because they would change the regulatory, safety and product expectations.
+The everyday product story is green workplace carpooling: colleagues on the same corridor share a recurring journey so fewer single-occupancy cars make the same trip.
+
+The initial product focuses on workplace trust, recurring patterns, privacy and dependable planning. Dynamic fares, driver earnings, surge pricing and marketplace take-rates are intentionally postponed because they would change the regulatory, safety and product expectations.
+
+Optional peer cost-sharing (for example contributing to fuel or parking) may be added later as a Circle agreement. That is different from turning Coleggo into a taxi marketplace. Until Circles, confirmations and trust boundaries work, money stays out of the critical path.

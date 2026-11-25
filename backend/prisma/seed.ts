@@ -1,9 +1,12 @@
+import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
   await prisma.$transaction([
+    prisma.idempotencyKey.deleteMany(),
+    prisma.refreshToken.deleteMany(),
     prisma.cancellationRecord.deleteMany(),
     prisma.attendance.deleteMany(),
     prisma.journeyOccurrence.deleteMany(),
@@ -16,6 +19,8 @@ async function main() {
     prisma.worksite.deleteMany(),
     prisma.workplace.deleteMany(),
   ]);
+
+  const passwordHash = await bcrypt.hash('Password123!', 10);
 
   const workplace = await prisma.workplace.create({
     data: { name: 'Northstar Works', slug: 'northstar', domain: 'northstar.example' },
@@ -30,7 +35,7 @@ async function main() {
       user: {
         create: {
           email: 'asha@northstar.example',
-          passwordHash: 'not-used-for-seed',
+          passwordHash,
         },
       },
       worksite: { connect: { id: worksite.id } },
@@ -44,6 +49,7 @@ async function main() {
       departureMinutes: 1050,
       availableSeats: 3,
       vehicleSummary: 'Blue estate, child seats available',
+      workplaceVerified: true,
     },
     include: { user: true },
   });
@@ -53,7 +59,7 @@ async function main() {
       user: {
         create: {
           email: 'ben@northstar.example',
-          passwordHash: 'not-used-for-seed',
+          passwordHash,
         },
       },
       worksite: { connect: { id: worksite.id } },
@@ -66,6 +72,7 @@ async function main() {
       arrivalMinutes: 510,
       departureMinutes: 1050,
       availableSeats: 0,
+      workplaceVerified: true,
     },
     include: { user: true },
   });
@@ -85,23 +92,11 @@ async function main() {
           { profileId: passengerProfile.id, role: 'passenger' },
         ],
       },
-      journeys: {
-        create: {
-          scheduledFor: new Date(Date.now() + 24 * 60 * 60 * 1000),
-          state: 'awaitingConfirmation',
-          driverId: driverProfile.id,
-          attendances: {
-            create: [
-              { profileId: driverProfile.id, status: 'travelling' },
-              { profileId: passengerProfile.id, status: 'travelling' },
-            ],
-          },
-        },
-      },
     },
   });
 
   console.log(`Seeded ${workplace.name} / ${worksite.name} / ${circle.name}`);
+  console.log('Demo logins: asha@northstar.example / ben@northstar.example password Password123!');
 }
 
 main()

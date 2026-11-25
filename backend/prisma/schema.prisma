@@ -7,36 +7,95 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum CircleState {
+  forming
+  active
+  full
+  paused
+  archived
+}
+
+enum JourneyState {
+  scheduled
+  awaitingConfirmation
+  confirmed
+  completed
+  cancelled
+  missed
+  archived
+}
+
+enum RequestStatus {
+  pending
+  accepted
+  declined
+  cancelled
+  expired
+}
+
+enum MembershipRole {
+  organiser
+  driver
+  passenger
+  backupDriver
+}
+
+enum CommuteRole {
+  driver
+  passenger
+  both
+}
+
+enum AttendanceStatus {
+  travelling
+  notTravelling
+  unsure
+}
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  profile       Profile?
-  notifications Notification[]
+  id              String         @id @default(cuid())
+  email           String         @unique
+  passwordHash    String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  profile         Profile?
+  notifications   Notification[]
   commuteRequests CommuteRequest[]
+  refreshTokens   RefreshToken[]
 
   @@map("users")
 }
 
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
 model Workplace {
-  id        String    @id @default(cuid())
+  id        String     @id @default(cuid())
   name      String
-  slug      String    @unique
-  domain    String    @unique
-  createdAt DateTime  @default(now())
+  slug      String     @unique
+  domain    String     @unique
+  createdAt DateTime   @default(now())
   worksites Worksite[]
 
   @@map("workplaces")
 }
 
 model Worksite {
-  id          String    @id @default(cuid())
+  id          String          @id @default(cuid())
   workplaceId String
   name        String
-  createdAt   DateTime  @default(now())
-  workplace   Workplace @relation(fields: [workplaceId], references: [id])
+  createdAt   DateTime        @default(now())
+  workplace   Workplace       @relation(fields: [workplaceId], references: [id])
   profiles    Profile[]
   circles     CommuteCircle[]
 
@@ -45,23 +104,24 @@ model Worksite {
 }
 
 model Profile {
-  id               String    @id @default(cuid())
-  userId           String    @unique
+  id               String             @id @default(cuid())
+  userId           String             @unique
   worksiteId       String
   firstName        String
   initials         String
-  role             String
+  role             CommuteRole
   homeArea         String
   corridor         String
   days             Int[]
   arrivalMinutes   Int
   departureMinutes Int
-  availableSeats   Int       @default(0)
+  availableSeats   Int                @default(0)
   vehicleSummary   String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  worksite         Worksite  @relation(fields: [worksiteId], references: [id])
+  workplaceVerified Boolean           @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  worksite         Worksite           @relation(fields: [worksiteId], references: [id])
   memberships      CircleMembership[]
   attendances      Attendance[]
   cancellations    CancellationRecord[]
@@ -70,16 +130,16 @@ model Profile {
 }
 
 model CommuteCircle {
-  id              String    @id @default(cuid())
+  id              String             @id @default(cuid())
   worksiteId      String
   name            String
   shiftLabel      String
   days            Int[]
   departureWindow String
   seats           Int
-  state           String    @default("active")
-  createdAt       DateTime  @default(now())
-  worksite        Worksite  @relation(fields: [worksiteId], references: [id])
+  state           CircleState        @default(active)
+  createdAt       DateTime           @default(now())
+  worksite        Worksite           @relation(fields: [worksiteId], references: [id])
   memberships     CircleMembership[]
   requests        CommuteRequest[]
   journeys        JourneyOccurrence[]
@@ -88,13 +148,13 @@ model CommuteCircle {
 }
 
 model CircleMembership {
-  id        String        @id @default(cuid())
+  id        String         @id @default(cuid())
   circleId  String
   profileId String
-  role      String
-  joinedAt  DateTime      @default(now())
-  circle    CommuteCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
-  profile   Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  role      MembershipRole
+  joinedAt  DateTime       @default(now())
+  circle    CommuteCircle  @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  profile   Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
   @@unique([circleId, profileId])
   @@map("circle_memberships")
@@ -105,7 +165,7 @@ model CommuteRequest {
   circleId    String
   requesterId String
   type        String
-  status      String        @default("pending")
+  status      RequestStatus @default(pending)
   message     String?
   createdAt   DateTime      @default(now())
   circle      CommuteCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
@@ -115,16 +175,18 @@ model CommuteRequest {
 }
 
 model JourneyOccurrence {
-  id                String       @id @default(cuid())
-  circleId          String
-  scheduledFor      DateTime
-  state             String       @default("scheduled")
-  driverId          String?
-  createdAt         DateTime     @default(now())
-  circle            CommuteCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
-  attendances       Attendance[]
-  cancellations     CancellationRecord[]
+  id            String               @id @default(cuid())
+  circleId      String
+  scheduledFor  DateTime
+  state         JourneyState         @default(scheduled)
+  driverId      String?
+  createdAt     DateTime             @default(now())
+  circle        CommuteCircle        @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  attendances   Attendance[]
+  cancellations CancellationRecord[]
 
+  @@unique([circleId, scheduledFor])
+  @@index([state, scheduledFor])
   @@map("journey_occurrences")
 }
 
@@ -132,7 +194,7 @@ model Attendance {
   id        String            @id @default(cuid())
   journeyId String
   profileId String
-  status    String
+  status    AttendanceStatus
   journey   JourneyOccurrence @relation(fields: [journeyId], references: [id], onDelete: Cascade)
   profile   Profile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
@@ -164,4 +226,18 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+model IdempotencyKey {
+  id           String   @id @default(cuid())
+  userId       String
+  key          String
+  method       String
+  path         String
+  statusCode   Int
+  responseBody Json
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, key, method, path])
+  @@map("idempotency_keys")
 }

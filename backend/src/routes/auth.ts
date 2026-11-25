@@ -2,7 +2,13 @@ import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { requireAuth, signToken, type AuthRequest } from '../middleware/auth';
+import {
+  issueRefreshToken,
+  requireAuth,
+  rotateRefreshToken,
+  signAccessToken,
+  type AuthRequest,
+} from '../middleware/auth';
 
 const router = Router();
 
@@ -54,6 +60,23 @@ const migrateSchema = z.object({
   })).default([]),
 });
 
+async function authPayload(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { profile: { include: { worksite: { include: { workplace: true } } } } },
+  });
+  if (!user) return null;
+  const accessToken = signAccessToken(user.id);
+  const refreshToken = await issueRefreshToken(user.id);
+  return {
+    token: accessToken,
+    accessToken,
+    refreshToken,
+    expiresIn: 15 * 60,
+    user: toUserDto(user),
+  };
+}
+
 router.post('/register', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -92,10 +115,9 @@ router.post('/register', async (req, res) => {
         },
       },
     },
-    include: { profile: { include: { worksite: { include: { workplace: true } } } } },
   });
-  const token = signToken(user.id);
-  res.status(201).json({ token, user: toUserDto(user) });
+  const payload = await authPayload(user.id);
+  res.status(201).json(payload);
 });
 
 router.post('/login', async (req, res) => {
@@ -106,14 +128,34 @@ router.post('/login', async (req, res) => {
   }
   const user = await prisma.user.findUnique({
     where: { email: parsed.data.email },
-    include: { profile: { include: { worksite: { include: { workplace: true } } } } },
   });
   if (!user || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
     res.status(401).json({ error: 'Invalid email or password' });
     return;
   }
-  const token = signToken(user.id);
-  res.json({ token, user: toUserDto(user) });
+  const payload = await authPayload(user.id);
+  res.json(payload);
+});
+
+router.post('/refresh', async (req, res) => {
+  const schema = z.object({ refreshToken: z.string().min(1) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid refresh token' });
+    return;
+  }
+  const rotated = await rotateRefreshToken(parsed.data.refreshToken);
+  if (!rotated) {
+    res.status(401).json({ error: 'Invalid refresh token' });
+    return;
+  }
+  const accessToken = signAccessToken(rotated.userId);
+  res.json({
+    token: accessToken,
+    accessToken,
+    refreshToken: rotated.refreshToken,
+    expiresIn: 15 * 60,
+  });
 });
 
 router.get('/me', requireAuth, async (req: AuthRequest, res) => {
@@ -145,6 +187,12 @@ router.post('/verify-workplace', requireAuth, async (req: AuthRequest, res) => {
   }
   const domain = parsed.data.email.split('@')[1];
   const matches = domain === user.profile.worksite.workplace.domain;
+  if (matches) {
+    await prisma.profile.update({
+      where: { id: user.profile.id },
+      data: { workplaceVerified: true },
+    });
+  }
   res.json({
     verified: matches,
     message: matches
@@ -279,6 +327,7 @@ function toUserDto(user: any) {
           departureMinutes: user.profile.departureMinutes,
           availableSeats: user.profile.availableSeats,
           vehicleSummary: user.profile.vehicleSummary,
+          workplaceVerified: user.profile.workplaceVerified ?? false,
           worksite: {
             id: user.profile.worksite.id,
             name: user.profile.worksite.name,
