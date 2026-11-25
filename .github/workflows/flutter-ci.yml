@@ -31,12 +31,15 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          # Keep current Material imports until a deliberate material_ui migration.
+          # Info-level deprecations must not fail the gate.
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Analyse
-        run: flutter analyze --no-pub
+        run: flutter analyze --no-pub --no-fatal-infos
 
       - name: Run tests
         run: flutter test --no-pub

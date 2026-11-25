@@ -19,6 +19,27 @@ jobs:
     name: Type check and test
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: coleggo
+          POSTGRES_PASSWORD: coleggo
+          POSTGRES_DB: coleggo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U coleggo -d coleggo"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://coleggo:coleggo@localhost:5432/coleggo?schema=public
+      JWT_SECRET: ci-test-secret-at-least-32-characters-long
+      NODE_ENV: test
+      CORS_ORIGIN: '*'
+
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -33,6 +54,9 @@ jobs:
 
       - name: Generate Prisma client
         run: npx prisma generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
 
       - name: Type check
         run: npx tsc --noEmit
