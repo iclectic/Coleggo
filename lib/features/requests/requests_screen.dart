@@ -219,8 +219,10 @@ class _CommuteRequestCard extends ConsumerWidget {
               .circles
               .where((item) => item.id == request.circleId)
               .firstOrNull;
+    final timedOut = request.status == CommuteRequestStatus.pending &&
+        DateTime.now().isAfter(request.expiresAt);
     final expired =
-        request.status == CommuteRequestStatus.expired || !request.isActive;
+        request.status == CommuteRequestStatus.expired || timedOut;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(

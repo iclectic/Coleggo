@@ -52,8 +52,15 @@ void main() {
       find.text('I can join Monday, Wednesday and Friday early shifts.'),
       findsOneWidget,
     );
-    await tester.scrollUntilVisible(find.text('Accept').last, 220);
-    await tester.tap(find.text('Accept').last);
+    final acceptInCircleCard = find.descendant(
+      of: find.ancestor(
+        of: find.text('I can join Monday, Wednesday and Friday early shifts.'),
+        matching: find.byType(Card),
+      ),
+      matching: find.text('Accept'),
+    );
+    await tester.scrollUntilVisible(acceptInCircleCard, 220);
+    await tester.tap(acceptInCircleCard);
     await tester.pumpAndSettle();
 
     expect(find.text('Accepted'), findsWidgets);

@@ -569,8 +569,8 @@ abstract final class MockData {
       worksiteId: 'central_exchange',
       seatsRequired: 1,
       intent: CommuteArrangementIntent.recurring,
-      createdAt: DateTime(2026, 7, 15, 9),
-      expiresAt: DateTime(2026, 7, 22, 9),
+      createdAt: DateTime.now().subtract(const Duration(days: 2)),
+      expiresAt: DateTime.now().add(const Duration(days: 14)),
       message: 'I can join Monday, Wednesday and Friday early shifts.',
     ),
     CommuteRequest(
@@ -585,8 +585,8 @@ abstract final class MockData {
       worksiteId: 'central_exchange',
       seatsRequired: 1,
       intent: CommuteArrangementIntent.recurring,
-      createdAt: DateTime(2026, 7, 1, 9),
-      expiresAt: DateTime(2026, 7, 8, 9),
+      createdAt: DateTime.now().subtract(const Duration(days: 21)),
+      expiresAt: DateTime.now().subtract(const Duration(days: 14)),
     ),
   ];
 
