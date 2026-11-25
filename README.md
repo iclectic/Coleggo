@@ -2,9 +2,9 @@
 
 **Go to work together**
 
-Coleggo is a private workplace commuting network for verified colleagues. It helps people form dependable, recurring journeys around shared worksites and shift patterns, with privacy-preserving discovery and explainable matching.
+Coleggo is a private workplace commuting network for verified colleagues. The everyday idea is simple: someone at your company already drives a similar route to work, and you want a reliable, greener way to share that commute.
 
-It is **not** a public taxi marketplace, fare product or live-tracking app. The product optimises for seat fill, journey confirmation, backup coverage and trust boundaries inside an organisation.
+It is **not** a public taxi marketplace, fare product or live-tracking app. The product optimises for seat fill, journey confirmation, backup coverage and trust boundaries inside an organisation. Optional peer cost-sharing may come later; marketplace driver earnings should not. See `docs/master_efficiency_roadmap.md` (Funding and money).
 
 ## Product plan (start here)
 

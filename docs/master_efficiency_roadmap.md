@@ -9,15 +9,18 @@
 
 Coleggo exists so verified colleagues can form dependable, recurring workplace journeys with privacy-preserving discovery, explainable matching, confirmation discipline and cancellation resilience.
 
+The everyday story is simple: a colleague at the same company already drives a similar route past your area, and you want a reliable way to share that commute. That is green by design: fewer single-occupancy cars on the same corridor, without turning colleagues into taxi drivers.
+
 It is not a public ride marketplace. Efficiency here means:
 
 - higher seat fill on recurring corridors;
 - fewer stranded passengers when a driver cancels;
 - faster confirmation of tomorrow’s journey;
 - lower privacy and trust risk than open lift-sharing;
-- lower employer friction than unmanaged informal WhatsApp groups.
+- lower employer friction than unmanaged informal WhatsApp groups;
+- measurable reduction in single-occupancy commuting where Circles form.
 
-If a feature increases marketplace theatre (fares, live tracking spectacle, star ratings) without improving fill rate, confirmation rate or backup coverage, it is the wrong investment.
+If a feature increases marketplace theatre (dynamic fares, live tracking spectacle, star ratings) without improving fill rate, confirmation rate or backup coverage, it is the wrong investment.
 
 ## Current plan stack (what already exists)
 
@@ -158,14 +161,69 @@ Principles:
 Do not add these while optimising for workplace commuting efficiency:
 
 - Public marketplace discovery outside verified worksites.
-- Fares, driver earnings, surge or tips as core mechanics.
+- Dynamic fares, surge pricing, driver earnings dashboards or tips as core mechanics.
 - Live GPS tracking as a default product surface.
 - Star ratings that imply character or safety.
 - Claims of licence, insurance or criminal-record verification.
 - Generative “AI matching” that cannot explain limitations.
 - Employer surveillance of individual home locations.
 
-Revisit payments only if employers explicitly need cost-sharing settlement that does not redefine the product as commercial passenger transport.
+Optional peer cost-sharing is allowed later as a Circle agreement, not as a marketplace. See **Funding and money** below.
+
+## Funding and money
+
+Funding is uncertain, and that is fine for the current stage. Do not let payment design redefine the product before Circles, confirmations and trust boundaries work.
+
+### What money is allowed to mean here
+
+There are two different money questions. Keep them separate.
+
+1. **How Coleggo the product is funded** (company runway, grants, employer contracts).
+2. **Whether colleagues share journey costs** (fuel, parking, congestion charge) inside a Circle.
+
+A passenger contributing towards a driver’s fuel is not the same thing as Coleggo becoming Uber.
+
+### Recommended default for peer money: cost-share, not fare
+
+If colleagues want a fee, model it as **optional journey cost-sharing**, agreed inside the Circle:
+
+- driver and passengers set a simple contribution (for example per journey or per week);
+- the amount should aim to share running costs, not create driver profit;
+- the app can later help calculate a suggested share from rough distance/corridor and days;
+- copy must say this is cost-sharing between colleagues, not a taxi fare and not employment as a driver.
+
+Why this matters (especially in the UK and similar markets): once drivers routinely profit from carrying passengers, the product can look like private hire / commercial passenger transport, with licensing, insurance and tax consequences. Cost-sharing keeps the green carpool story intact. Exact legal thresholds need qualified advice before any live payments launch; this roadmap is product direction, not legal advice.
+
+### Do not build first
+
+- Card payments, wallets, payouts, escrow or platform take-rates on every journey.
+- Surge, promotional credits or driver “earnings” leaderboards.
+- Making payment required before someone can join a Circle.
+
+Early Circles should work with “settle outside the app” or “no money involved”. Money features are an add-on for Circles that want them.
+
+### How to fund Coleggo itself (preferred order)
+
+| Model | Fit | Notes |
+| --- | --- | --- |
+| Employer / facilities contract | Best long-term fit | Employer pays for fewer cars on site, sustainability reporting, quieter informal WhatsApp chaos. B2B. |
+| Climate / mobility grants and partnerships | Strong for green positioning | Local authorities, employers’ net-zero programmes, transport innovation funds. |
+| Freemium workplace pilot | Useful early | Free for a worksite pilot; paid admin, SSO and analytics later. |
+| Optional platform fee on cost-share | Possible later only | Small facilitation fee if in-app settlement exists; never the main growth engine. |
+| Advertising or public marketplace take-rate | Poor fit | Conflicts with private workplace identity and trust. |
+
+Practical sequence while funding is unclear:
+
+1. Prove Circles work and reduce single-occupancy trips at one worksite.
+2. Sell that outcome to the employer (parking pressure, emissions, staff reliability), not to passengers as a ride brand.
+3. Add optional cost-share **agreements** in-product (amounts + expectations) before any payment rail.
+4. Only then consider in-app settlement, and only if legal review clears cost-sharing vs commercial hire for the launch region.
+
+### Product rule
+
+**Matching and reliability first. Money second. Marketplace never.**
+
+Peer contributions may exist. Driver profit marketplaces should not.
 
 ## Engineering quality bar
 
@@ -195,17 +253,20 @@ Revisit payments only if employers explicitly need cost-sharing settlement that 
 | “No chat / no push” honesty | Keep for prototype; Phase 2 must replace placeholders with real systems. |
 | Production-readiness P1 scope | Keep direction; widen to full domain parity before calling it pilot-ready. |
 | Pilot metric “5 Circles in two weeks” | Keep as a volume gate; add confirmation rate and backup coverage as harder gates. |
-| Postponing payments and live maps | Keep. Correct for regulatory and product focus. |
+| Postponing payments and live maps | Keep for core build; allow later optional cost-share, not marketplace fares. |
 | Fragmented docs without a master index | Change. This file plus README become the index. |
+| Green colleague carpool story | Elevate. This is the everyday reason people care. |
 
 ## Definition of “highest form” for Coleggo
 
 The highest form is not a clone of Uber. It is an in-house commuting fabric where:
 
+- a colleague on your corridor can invite you into a dependable recurring Circle;
 - every active Circle has a known driver, backup path and confirmation habit;
 - matching is explainable, worksite-bounded and server-enforced;
 - privacy defaults survive scale;
-- organisers and employers see corridor efficiency without invading home privacy;
-- cancellations almost never leave passengers without a plan.
+- organisers and employers see corridor efficiency and greener commuting without invading home privacy;
+- cancellations almost never leave passengers without a plan;
+- money, if present, is optional cost-sharing between colleagues, not a public fare market.
 
 That is the efficiency product Coleggo should become.
