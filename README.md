@@ -12,8 +12,8 @@ It is **not** a public taxi marketplace, fare product or live-tracking app. The 
 | --- | --- | --- |
 | Prototype | Local Flutter vertical slice: Circles, shifts, matching, privacy | `docs/two_hour_build_plan.md`, `docs/standout_implementation_plan.md` |
 | Distinctive slice | Commute Circles, confirmation, cancellation backup, reliability | `docs/plans/2026-07-15-001-feat-workplace-commuting-vertical-slice-plan.md` |
-| Server P1 | Auth, API, persisted Circles and journeys | `docs/plans/2026-07-17-002-feat-production-readiness-plan.md`, `backend/README.md` |
-| Company scale | Server-authoritative matching, jobs, SSO, metrics, messaging | **`docs/master_efficiency_roadmap.md`** |
+| Server P1 | Auth, Circles, journeys, **server matching, jobs, reliability, metrics** | `docs/plans/2026-07-17-002-feat-production-readiness-plan.md`, `docs/phase1_execution_report.md`, `backend/README.md` |
+| Company scale | SSO, employer admin, push, messaging moderation | **`docs/master_efficiency_roadmap.md`** |
 
 **North star:** verified colleagues form recurring Commute Circles that survive real working weeks (confirmations, cancellations, backups) without exposing exact home addresses or pretending to verify licences, insurance or character.
 

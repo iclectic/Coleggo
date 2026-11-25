@@ -140,8 +140,15 @@ class BackendCommuteCircleRepository implements CommuteCircleRepository {
 
   CircleMember _mapMember(Map<String, dynamic> json) => CircleMember(
         profileId: json['id'] as String,
-        role: CircleMemberRole.values.byName(json['role'] as String? ?? 'passenger'),
+        role: _mapMemberRole(json['role'] as String? ?? 'passenger'),
       );
+
+  CircleMemberRole _mapMemberRole(String role) => switch (role) {
+        'organiser' || 'driver' || 'primaryDriver' =>
+          CircleMemberRole.primaryDriver,
+        'backupDriver' => CircleMemberRole.backupDriver,
+        _ => CircleMemberRole.passenger,
+      };
 
   CommuteRequest _mapRequest(Map<String, dynamic> json) {
     final statusName = json['status'] as String? ?? 'pending';

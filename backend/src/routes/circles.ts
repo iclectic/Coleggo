@@ -1,5 +1,7 @@
+import { MembershipRole, RequestStatus } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
+import { withIdempotency } from '../lib/idempotency';
 import { prisma } from '../lib/prisma';
 import { paramId, requireAuth, type AuthRequest } from '../middleware/auth';
 
@@ -15,13 +17,13 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
     return;
   }
   const circles = await prisma.commuteCircle.findMany({
-    where: { worksiteId: profile.worksiteId, state: 'active' },
+    where: { worksiteId: profile.worksiteId, state: { in: ['active', 'full', 'forming'] } },
     include: {
       _count: { select: { memberships: true, requests: true } },
     },
   });
   res.json({
-    circles: circles.map((circle: any) => ({
+    circles: circles.map((circle) => ({
       id: circle.id,
       name: circle.name,
       shiftLabel: circle.shiftLabel,
@@ -44,7 +46,11 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
       worksite: { include: { workplace: true } },
       memberships: { include: { profile: true } },
       requests: { include: { requester: { include: { profile: true } } } },
-      journeys: { orderBy: { scheduledFor: 'asc' }, take: 1 },
+      journeys: {
+        where: { state: { in: ['scheduled', 'awaitingConfirmation', 'confirmed'] } },
+        orderBy: { scheduledFor: 'asc' },
+        take: 1,
+      },
     },
   });
   if (!circle) {
@@ -52,8 +58,10 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
     return;
   }
   const profile = await prisma.profile.findUnique({ where: { userId: req.userId } });
-  const isMember = circle.memberships.some((m: any) => m.profileId === profile?.id);
-  const existingRequest = circle.requests.find((r: any) => r.requesterId === req.userId && r.status === 'pending');
+  const isMember = circle.memberships.some((m) => m.profileId === profile?.id);
+  const existingRequest = circle.requests.find(
+    (r) => r.requesterId === req.userId && r.status === RequestStatus.pending,
+  );
   res.json({
     id: circle.id,
     name: circle.name,
@@ -64,7 +72,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
     state: circle.state,
     isMember,
     hasPendingRequest: !!existingRequest,
-    members: circle.memberships.map((m: any) => ({
+    members: circle.memberships.map((m) => ({
       id: m.profile.id,
       firstName: m.profile.firstName,
       initials: m.profile.initials,
@@ -72,13 +80,16 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
     })),
     requests: isMember
       ? circle.requests
-          .filter((r: any) => r.status === 'pending')
-          .map((r: any) => ({
+          .filter((r) => r.status === RequestStatus.pending)
+          .map((r) => ({
             id: r.id,
             requesterId: r.requesterId,
             firstName: r.requester.profile?.firstName,
             initials: r.requester.profile?.initials,
             message: r.message,
+            status: r.status,
+            circleId: r.circleId,
+            createdAt: r.createdAt,
           }))
       : [],
     nextJourney: circle.journeys[0]
@@ -87,7 +98,7 @@ router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
-router.post('/:id/join', requireAuth, async (req: AuthRequest, res) => {
+router.post('/:id/join', requireAuth, withIdempotency, async (req: AuthRequest, res) => {
   const id = paramId(req, 'id');
   if (!id) { res.status(400).json({ error: 'Invalid id' }); return; }
   const circle = await prisma.commuteCircle.findUnique({
@@ -103,12 +114,14 @@ router.post('/:id/join', requireAuth, async (req: AuthRequest, res) => {
     res.status(404).json({ error: 'Profile not found' });
     return;
   }
-  const isMember = circle.memberships.some((m: any) => m.profileId === profile.id);
+  const isMember = circle.memberships.some((m) => m.profileId === profile.id);
   if (isMember) {
     res.status(409).json({ error: 'Already a member' });
     return;
   }
-  const existingPending = circle.requests.some((r: any) => r.requesterId === req.userId && r.status === 'pending');
+  const existingPending = circle.requests.some(
+    (r) => r.requesterId === req.userId && r.status === RequestStatus.pending,
+  );
   if (existingPending) {
     res.status(409).json({ error: 'Join request already pending' });
     return;
@@ -124,7 +137,7 @@ router.post('/:id/join', requireAuth, async (req: AuthRequest, res) => {
   res.status(201).json({ request });
 });
 
-router.post('/:id/accept', requireAuth, async (req: AuthRequest, res) => {
+router.post('/:id/accept', requireAuth, withIdempotency, async (req: AuthRequest, res) => {
   const id = paramId(req, 'id');
   if (!id) { res.status(400).json({ error: 'Invalid id' }); return; }
   const schema = z.object({ requestId: z.string() });
@@ -142,29 +155,40 @@ router.post('/:id/accept', requireAuth, async (req: AuthRequest, res) => {
     return;
   }
   const profile = await prisma.profile.findUnique({ where: { userId: req.userId } });
-  const isOrganiser = circle.memberships.some((m: any) => m.profileId === profile?.id && m.role === 'organiser');
+  const isOrganiser = circle.memberships.some(
+    (m) =>
+      m.profileId === profile?.id
+      && (m.role === MembershipRole.organiser || m.role === MembershipRole.driver),
+  );
   if (!isOrganiser && circle.memberships.length > 0) {
     res.status(403).json({ error: 'Only organisers can accept requests' });
     return;
   }
   const request = await prisma.commuteRequest.update({
     where: { id: parsed.data.requestId },
-    data: { status: 'accepted' },
+    data: { status: RequestStatus.accepted },
     include: { requester: { include: { profile: true } } },
   });
   if (request.requester.profile) {
-    await prisma.circleMembership.create({
-      data: {
+    await prisma.circleMembership.upsert({
+      where: {
+        circleId_profileId: {
+          circleId: circle.id,
+          profileId: request.requester.profile.id,
+        },
+      },
+      create: {
         circleId: circle.id,
         profileId: request.requester.profile.id,
-        role: 'passenger',
+        role: MembershipRole.passenger,
       },
+      update: {},
     });
   }
   res.json({ request });
 });
 
-router.post('/:id/decline', requireAuth, async (req: AuthRequest, res) => {
+router.post('/:id/decline', requireAuth, withIdempotency, async (req: AuthRequest, res) => {
   const id = paramId(req, 'id');
   if (!id) { res.status(400).json({ error: 'Invalid id' }); return; }
   const schema = z.object({ requestId: z.string() });
@@ -175,7 +199,7 @@ router.post('/:id/decline', requireAuth, async (req: AuthRequest, res) => {
   }
   const request = await prisma.commuteRequest.update({
     where: { id: parsed.data.requestId },
-    data: { status: 'declined' },
+    data: { status: RequestStatus.declined },
   });
   res.json({ request });
 });

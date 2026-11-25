@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+
 import 'token_storage_service.dart';
 
 class BackendApiClient {
@@ -41,15 +42,28 @@ class BackendApiClient {
   final TokenStorageService _tokenStorage;
 
   Future<void> saveToken(String token) => _tokenStorage.writeToken(token);
+  Future<void> saveRefreshToken(String token) =>
+      _tokenStorage.writeRefreshToken(token);
   Future<void> clearToken() => _tokenStorage.deleteToken();
   Future<String?> getToken() => _tokenStorage.readToken();
+  Future<String?> getRefreshToken() => _tokenStorage.readRefreshToken();
 
   Future<Response<T>> get<T>(String path, {Map<String, dynamic>? queryParameters}) async {
     return _dio.get<T>(path, queryParameters: queryParameters);
   }
 
-  Future<Response<T>> post<T>(String path, {Object? data}) async {
-    return _dio.post<T>(path, data: data);
+  Future<Response<T>> post<T>(
+    String path, {
+    Object? data,
+    String? idempotencyKey,
+  }) async {
+    return _dio.post<T>(
+      path,
+      data: data,
+      options: idempotencyKey == null
+          ? null
+          : Options(headers: {'Idempotency-Key': idempotencyKey}),
+    );
   }
 
   Future<Response<T>> delete<T>(String path) async {

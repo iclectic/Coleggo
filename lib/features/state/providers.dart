@@ -6,6 +6,7 @@ import '../../data/models/app_state.dart';
 import '../../data/models/commuter_profile.dart';
 import '../../data/models/match_result.dart';
 import '../../data/repositories/backend_circle_repository.dart';
+import '../../data/repositories/backend_domain_repositories.dart';
 import '../../data/repositories/backend_journey_repository.dart';
 import '../../data/repositories/backend_repositories.dart';
 import '../../data/repositories/local_repositories.dart';
@@ -45,7 +46,9 @@ final authRepositoryProvider = Provider<AuthRepository>(
 );
 
 final workplaceRepositoryProvider = Provider<WorkplaceRepository>(
-  (ref) => MockWorkplaceRepository(),
+  (ref) => _useBackend
+      ? BackendWorkplaceRepository(ref.watch(backendApiClientProvider))
+      : MockWorkplaceRepository(),
 );
 
 final profileRepositoryProvider = Provider<ProfileRepository>(
@@ -59,7 +62,9 @@ final commuteRepositoryProvider = Provider<CommuteRepository>(
 );
 
 final matchRepositoryProvider = Provider<MatchRepository>(
-  (ref) => MockMatchRepository(ref.watch(matchingServiceProvider)),
+  (ref) => _useBackend
+      ? BackendMatchRepository(ref.watch(backendApiClientProvider))
+      : MockMatchRepository(ref.watch(matchingServiceProvider)),
 );
 
 final rideRequestRepositoryProvider = Provider<RideRequestRepository>(
@@ -79,12 +84,18 @@ final journeyRepositoryProvider = Provider<JourneyRepository>(
 );
 
 final reliabilityRepositoryProvider = Provider<ReliabilityRepository>(
-  (ref) => MockReliabilityRepository(),
+  (ref) => _useBackend
+      ? BackendReliabilityRepository(ref.watch(backendApiClientProvider))
+      : MockReliabilityRepository(),
 );
 
 final workplaceVerificationRepositoryProvider =
     Provider<WorkplaceVerificationRepository>(
-      (ref) => MockWorkplaceVerificationRepository(),
+      (ref) => _useBackend
+          ? BackendWorkplaceVerificationRepository(
+              ref.watch(backendApiClientProvider),
+            )
+          : MockWorkplaceVerificationRepository(),
     );
 
 final commuteRequestRepositoryProvider = Provider<CommuteRequestRepository>(

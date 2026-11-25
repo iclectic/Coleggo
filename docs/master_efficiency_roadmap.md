@@ -116,7 +116,8 @@ Principles:
 
 ### Phase 1: Close the production seam (highest leverage)
 
-**Goal:** One mode, one truth for the commute core.
+**Goal:** One mode, one truth for the commute core.  
+**Status:** Executed on 25 November 2026. See `docs/phase1_execution_report.md`.
 
 1. Move matching, workplaces, verification sessions, commute requests and reliability behind the same backend flag path as circles and journeys.
 2. Add server-side matching endpoint with the existing 100-point weights, eligibility and limitations.
@@ -236,11 +237,11 @@ Peer contributions may exist. Driver profit marketplaces should not.
 
 ## Recommended immediate sequence
 
-1. Update README so the plan is discoverable (this roadmap).
-2. Finish Phase 1 server parity for matching, requests and verification.
-3. Add occurrence generation and confirmation-window jobs.
-4. Instrument the efficiency metrics table above.
-5. Run the prototype validation plan with 5–8 real commuters.
+1. Update README so the plan is discoverable (this roadmap). **Done.**
+2. Finish Phase 1 server parity for matching, requests and verification. **Done.**
+3. Add occurrence generation and confirmation-window jobs. **Done.**
+4. Instrument the efficiency metrics table above. **Done** (`GET /metrics/efficiency`).
+5. Run the prototype validation plan with 5–8 real commuters. **Next.**
 6. Only then expand to SSO, push and employer admin.
 
 ## Critique of earlier plans (keep / change / drop)
