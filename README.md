@@ -2,16 +2,51 @@
 
 **Go to work together**
 
-Coleggo is a local-only Flutter prototype for voluntary workplace lift sharing. It demonstrates workplace verification, commuter profiles, explainable estimated matching, requests and recurring commutes using fictional data.
+Coleggo is a private workplace commuting network for verified colleagues. It helps people form dependable, recurring journeys around shared worksites and shift patterns, with privacy-preserving discovery and explainable matching.
 
-## Run locally
+It is **not** a public taxi marketplace, fare product or live-tracking app. The product optimises for seat fill, journey confirmation, backup coverage and trust boundaries inside an organisation.
+
+## Product plan (start here)
+
+| Phase | Intent | Primary docs |
+| --- | --- | --- |
+| Prototype | Local Flutter vertical slice: Circles, shifts, matching, privacy | `docs/two_hour_build_plan.md`, `docs/standout_implementation_plan.md` |
+| Distinctive slice | Commute Circles, confirmation, cancellation backup, reliability | `docs/plans/2026-07-15-001-feat-workplace-commuting-vertical-slice-plan.md` |
+| Server P1 | Auth, API, persisted Circles and journeys | `docs/plans/2026-07-17-002-feat-production-readiness-plan.md`, `backend/README.md` |
+| Company scale | Server-authoritative matching, jobs, SSO, metrics, messaging | **`docs/master_efficiency_roadmap.md`** |
+
+**North star:** verified colleagues form recurring Commute Circles that survive real working weeks (confirmations, cancellations, backups) without exposing exact home addresses or pretending to verify licences, insurance or character.
+
+Read `docs/master_efficiency_roadmap.md` for the ranked improvement plan, efficiency metrics and what to build next. Read `docs/product_differentiation.md` for identity guardrails.
+
+## Current capability
+
+- Flutter client with Material 3, Riverpod, `go_router` and repository interfaces.
+- Local demo mode with fictional workplaces, Circles, matching and persistence.
+- Optional backend mode (`COLEGGO_USE_BACKEND`) with Node.js/Express, PostgreSQL/Prisma, JWT auth, Circles, journeys and notifications.
+- Simulated workplace verification code in local mode: `246810`.
+
+Prototype safety boundary: all organisations and profiles in fixtures are fictional. Workplace verification confirms simulated access to a workplace email, not identity or driving fitness. Drivers remain responsible for their vehicle, licence and insurance. Prefer public meeting points.
+
+## Run locally (Flutter)
 
 ```bash
 flutter pub get
 flutter run
 ```
 
-The simulated workplace verification code is `246810`.
+### Backend-backed client
+
+```bash
+# terminal 1
+cd backend && cp .env.example .env && docker compose up -d
+npm install && npx prisma migrate dev && npx prisma db seed && npm run dev
+
+# terminal 2
+flutter run --dart-define=COLEGGO_USE_BACKEND=true --dart-define=COLEGGO_API_BASE_URL=http://localhost:3000
+```
+
+See `backend/README.md` and `docs/staging_deployment.md` for API and staging details.
 
 ## Quality checks
 
@@ -21,12 +56,28 @@ flutter analyze
 flutter test
 ```
 
-## Architecture
+Backend:
 
-The app uses Material 3, Riverpod, `go_router`, `shared_preferences`, `intl`, repository interfaces and local Dart fixtures. Important state is stored as one versioned JSON snapshot. No network service or API key is required.
+```bash
+cd backend && npm test
+```
 
-## Prototype safety boundary
+## Architecture snapshot
 
-All organisations, worksites and commuter profiles are fictional. Workplace verification confirms simulated access to a workplace email, not a person’s identity or character. Coleggo does not verify driving ability, licences, vehicle condition, insurance or criminal history. Drivers remain responsible for their vehicle, licence and insurance, and users should choose safe public meeting points.
+```text
+Screens → Riverpod controllers → repository interfaces
+                                      ├─ local mock repos + SharedPreferences
+                                      └─ backend API client (optional)
+```
 
-See `docs/two_hour_build_plan.md` for the complete implementation scope and exclusions.
+Important local state is one versioned JSON snapshot. Production direction is server-authoritative Circles, journeys and matching, with the client as a cache and UI layer. Mock and production implementations stay separated on purpose.
+
+## Documentation map
+
+- `docs/master_efficiency_roadmap.md` – master plan and senior critique
+- `docs/domain_model.md` – domain vocabulary
+- `docs/privacy_product_principles.md` – discovery and location rules
+- `docs/future_backend_requirements.md` – backend backlog
+- `docs/prototype_validation_plan.md` – user validation before pilot
+- `docs/v4_migration.md` – local-to-server migration
+- `AGENTS.md` – contributor rules
