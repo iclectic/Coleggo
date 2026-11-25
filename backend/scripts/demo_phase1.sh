@@ -61,10 +61,11 @@ OUT="${1:-/tmp/coleggo_phase1_demo.txt}"
   echo "passenger registered"
   echo
 
+  ORG_EMAIL="demo.driver+$SUFFIX@northstar.example"
   echo "== verify workplace =="
   curl -sS -X POST "$BASE_URL/auth/verify-workplace" \
     -H "Authorization: Bearer $ORG_TOKEN" -H 'Content-Type: application/json' \
-    -d '{"email":"demo.driver@northstar.example"}' | python3 -m json.tool
+    -d "{\"email\":\"$ORG_EMAIL\"}" | python3 -m json.tool
   echo
 
   echo "== matches =="
