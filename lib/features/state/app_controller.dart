@@ -606,7 +606,7 @@ class AppController extends Notifier<AppState> {
       );
       return null;
     }
-    return result.data;
+    return result.value;
   }
 
   Future<bool> deleteAccount() async {
