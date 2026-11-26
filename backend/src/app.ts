@@ -10,13 +10,16 @@ import reliabilityRoutes from './routes/reliability';
 import metricsRoutes from './routes/metrics';
 import jobRoutes from './routes/jobs';
 import messageRoutes from './routes/messages';
+import moderationRoutes from './routes/moderation';
 import { getRuntimeConfig } from './lib/runtimeConfig';
+import { requestLogging } from './middleware/requestLogging';
 
 export function createApp() {
   const { corsOrigin } = getRuntimeConfig();
   const app = express();
   app.use(cors({ origin: corsOrigin }));
   app.use(express.json());
+  app.use(requestLogging);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
@@ -31,6 +34,7 @@ export function createApp() {
   app.use('/circles', circleRoutes);
   app.use('/journeys', journeyRoutes);
   app.use('/notifications', notificationRoutes);
+  app.use('/moderation', moderationRoutes);
   app.use(messageRoutes);
 
   return app;

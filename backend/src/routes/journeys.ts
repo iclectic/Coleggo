@@ -1,12 +1,20 @@
 import { AttendanceStatus, JourneyState, MembershipRole } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
+import { recordEvent } from '../lib/audit';
 import { withIdempotency } from '../lib/idempotency';
 import { assertTransition } from '../lib/journeyStates';
 import { prisma } from '../lib/prisma';
+import { checkRateLimit } from '../lib/rateLimit';
 import { paramId, requireAuth, type AuthRequest } from '../middleware/auth';
 
 const router = Router();
+
+/**
+ * Conflict rule for attendance: server upsert wins. Clients may queue offline
+ * confirmations and replay with Idempotency-Key; the latest accepted server
+ * write updates Attendance.updatedAt.
+ */
 
 router.get('/next', requireAuth, async (req: AuthRequest, res) => {
   const profile = await prisma.profile.findUnique({ where: { userId: req.userId } });
@@ -69,6 +77,12 @@ router.post('/:id/confirm', requireAuth, withIdempotency, async (req: AuthReques
     return;
   }
 
+  const rate = checkRateLimit(`confirm:${req.userId}`, 30, 60_000);
+  if (!rate.allowed) {
+    res.status(429).json({ error: 'Too many confirmation attempts. Please wait a minute.' });
+    return;
+  }
+
   const attendance = await prisma.attendance.upsert({
     where: { journeyId_profileId: { journeyId: id, profileId: profile.id } },
     create: { journeyId: id, profileId: profile.id, status: parsed.data.status },
@@ -87,6 +101,14 @@ router.post('/:id/confirm', requireAuth, withIdempotency, async (req: AuthReques
       // Keep existing state if transition is not allowed.
     }
   }
+
+  await recordEvent({
+    type: 'attendance.confirmed',
+    actorUserId: req.userId,
+    subjectType: 'journey',
+    subjectId: id,
+    payload: { status: parsed.data.status, attendanceId: attendance.id },
+  });
 
   res.json({ attendance });
 });
@@ -133,6 +155,13 @@ router.post('/:id/cancel', requireAuth, withIdempotency, async (req: AuthRequest
       reason: parsed.data.reason,
       affectedPassengers: affected,
     },
+  });
+  await recordEvent({
+    type: 'journey.cancelled',
+    actorUserId: req.userId,
+    subjectType: 'journey',
+    subjectId: journey.id,
+    payload: { reason: parsed.data.reason, affectedPassengers: affected },
   });
 
   const backupCandidates = journey.circle.memberships
@@ -185,6 +214,16 @@ router.post('/:id/backup', requireAuth, withIdempotency, async (req: AuthRequest
       },
     },
     include: { circle: true },
+  });
+  await recordEvent({
+    type: 'journey.backup_selected',
+    actorUserId: req.userId,
+    subjectType: 'journey',
+    subjectId: cancelled.id,
+    payload: {
+      replacementJourneyId: replacement.id,
+      driverProfileId: parsed.data.driverProfileId,
+    },
   });
   res.json({ replacement });
 });

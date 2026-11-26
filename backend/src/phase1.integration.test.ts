@@ -19,6 +19,8 @@ describe('Phase 1 production seam', () => {
       prisma.messageModerationReport.deleteMany(),
       prisma.message.deleteMany(),
       prisma.messageThread.deleteMany(),
+      prisma.domainEvent.deleteMany(),
+      prisma.legalHold.deleteMany(),
       prisma.idempotencyKey.deleteMany(),
       prisma.refreshToken.deleteMany(),
       prisma.cancellationRecord.deleteMany(),

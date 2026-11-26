@@ -18,6 +18,8 @@ describe('Phase 2 workplace operating system', () => {
       prisma.messageModerationReport.deleteMany(),
       prisma.message.deleteMany(),
       prisma.messageThread.deleteMany(),
+      prisma.domainEvent.deleteMany(),
+      prisma.legalHold.deleteMany(),
       prisma.idempotencyKey.deleteMany(),
       prisma.refreshToken.deleteMany(),
       prisma.cancellationRecord.deleteMany(),

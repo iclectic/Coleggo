@@ -34,6 +34,15 @@ Deletion is immediate from the primary application database. Copies in encrypted
 - Keep a documented record of any legal hold that pauses deletion.
 - Review this schedule after changes to product scope, hosting, incident handling or applicable law.
 
+## Implementation hooks (Phase 3)
+
+| Control | Behaviour |
+| --- | --- |
+| Account export | `GET /auth/export` returns profile, memberships, attendance, reports and actor audit events |
+| Legal hold | Active `LegalHold` rows (`user`, `workplace` or `global`) return HTTP 423 on `DELETE /auth/account` and skip global retention purge |
+| Retention job | `POST /jobs/apply-retention` deletes resolved abuse reports older than 12 months, idempotency keys older than 7 days, and anonymises audit actor ids older than 30 days |
+| Audit retention | Domain events are append-only; actor linkage is cleared after the security-log window rather than deleting the event story |
+
 ## Before publication
 
 The launch owner must complete the bracketed contact details, confirm jurisdictions, validate backup retention with infrastructure providers, and obtain legal/privacy approval.

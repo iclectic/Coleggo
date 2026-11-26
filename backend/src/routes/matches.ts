@@ -13,6 +13,9 @@ function toMatchProfile(profile: {
   worksiteId: string;
   homeArea: string;
   corridor: string;
+  postcodeDistrict: string | null;
+  approxLatitude: number | null;
+  approxLongitude: number | null;
   days: number[];
   arrivalMinutes: number;
   departureMinutes: number;
@@ -27,6 +30,9 @@ function toMatchProfile(profile: {
     worksiteId: profile.worksiteId,
     homeArea: profile.homeArea,
     corridor: profile.corridor,
+    postcodeDistrict: profile.postcodeDistrict,
+    approxLatitude: profile.approxLatitude,
+    approxLongitude: profile.approxLongitude,
     days: profile.days,
     arrivalMinutes: profile.arrivalMinutes,
     departureMinutes: profile.departureMinutes,

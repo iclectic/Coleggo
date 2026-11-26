@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { recordEvent } from '../lib/audit';
 import { withIdempotency } from '../lib/idempotency';
 import { assessMessageBody } from '../lib/messageSafety';
 import { prisma } from '../lib/prisma';
 import { isInQuietHours } from '../lib/quietHours';
+import { checkRateLimit } from '../lib/rateLimit';
 import { paramId, requireAuth, type AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -83,6 +85,11 @@ router.post('/circles/:id/messages', requireAuth, withIdempotency, async (req: A
   }
   const { profile } = access;
 
+  const sharedLimit = checkRateLimit(`message:${profile.id}`, MESSAGE_RATE_LIMIT, MESSAGE_RATE_WINDOW_MS);
+  if (!sharedLimit.allowed) {
+    res.status(429).json({ error: 'Message rate limit exceeded. Please wait a minute.' });
+    return;
+  }
   const recentCount = await prisma.message.count({
     where: {
       senderProfileId: profile.id,
@@ -182,6 +189,13 @@ router.post('/messages/:id/report', requireAuth, withIdempotency, async (req: Au
   await prisma.message.update({
     where: { id: messageId },
     data: { deliveryState: 'flagged' },
+  });
+  await recordEvent({
+    type: 'moderation.reported',
+    actorUserId: req.userId,
+    subjectType: 'message',
+    subjectId: messageId,
+    payload: { reportId: report.id, reason: parsed.data.reason },
   });
   res.status(201).json({ report });
 });
