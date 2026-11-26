@@ -156,6 +156,16 @@ class BackendAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<RepositoryResult<Map<String, dynamic>>> exportAccountData() async {
+    try {
+      final response = await _client.get<Map<String, dynamic>>('/auth/export');
+      return RepositoryResult.data(response.data ?? const <String, dynamic>{});
+    } on DioException catch (e) {
+      return RepositoryResult.failure(handleDioError(e));
+    }
+  }
+
+  @override
   Future<RepositoryResult<void>> deleteAccount() async {
     try {
       await _client.delete<void>('/auth/account');

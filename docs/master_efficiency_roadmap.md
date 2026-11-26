@@ -146,7 +146,8 @@ Principles:
 
 ### Phase 3: Scale and hard reliability
 
-**Goal:** Uber-grade operational discipline for the commuting domain.
+**Goal:** Uber-grade operational discipline for the commuting domain.  
+**Status:** Slice executed on 26 November 2026. See `docs/phase3_execution_report.md`. Full Flutter offline outbox, OTEL collectors, crash reporting and device attestation remain deferred.
 
 1. Event-sourced audit log for membership, attendance, cancellation and moderation actions.
 2. Observability: structured logs, traces, SLOs on API latency and error budget, crash reporting in the app.
@@ -244,7 +245,8 @@ Peer contributions may exist. Driver profit marketplaces should not.
 4. Instrument the efficiency metrics table above. **Done** (`GET /metrics/efficiency`).
 5. Run the prototype validation plan with 5–8 real commuters. **Next.**
 6. Phase 2 workplace ops slice (invites, organiser tools, messaging). **Done.**
-7. Optional SSO (OIDC) and real push delivery. **Next after validation.**
+7. Phase 3 hard reliability slice (audit, SLO, export/retention, capacity hints). **Done.**
+8. Optional SSO (OIDC), real push delivery, full offline outbox. **Next after validation.**
 
 ## Critique of earlier plans (keep / change / drop)
 

@@ -96,6 +96,11 @@ See `.env.example` for required values.
 | `POST /auth/verify-workplace` | Verify workplace email domain (not driving fitness) |
 | `POST /auth/redeem-invite` | Resolve an employer invitation code |
 | `PATCH /auth/preferences` | Quiet hours preferences |
+| `GET /auth/export` | Export account data for the signed-in user |
+| `GET /metrics/slo` | Rolling API latency / error-budget snapshot |
+| `GET /metrics/audit-events` | Recent domain audit events for the signed-in actor |
+| `PATCH /moderation/reports/:id` | Review, dismiss or escalate a message report |
+| `POST /jobs/apply-retention` | Apply retention purge (manual/staging) |
 | `GET /workplaces` | List workplaces and worksites |
 | `GET /matches` | Server-side explainable commute matches |
 | `GET /reliability/me` | Behavioural reliability signals for the current user |

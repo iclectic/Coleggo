@@ -92,6 +92,15 @@ class SettingsScreen extends ConsumerWidget {
                 if (backendModeEnabled) ...[
                   const Divider(height: 1),
                   ListTile(
+                    leading: const Icon(Icons.download_outlined),
+                    title: const Text('Export my data'),
+                    subtitle: const Text(
+                      'Download a copy of your account, membership and audit data',
+                    ),
+                    onTap: () => _exportAccountData(context, ref),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
                     leading: Icon(
                       Icons.delete_forever_outlined,
                       color: Theme.of(context).colorScheme.error,
@@ -141,6 +150,42 @@ class SettingsScreen extends ConsumerWidget {
     if (!reset) return;
     await ref.read(appControllerProvider.notifier).reset();
     if (context.mounted) context.go('/onboarding');
+  }
+
+  Future<void> _exportAccountData(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final exported = await ref
+        .read(appControllerProvider.notifier)
+        .exportAccountData();
+    if (!context.mounted) return;
+    if (exported == null) {
+      final error = ref.read(appControllerProvider).errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error ?? 'Your data export could not be prepared.')),
+      );
+      return;
+    }
+    final membershipCount = (exported['memberships'] as List<dynamic>? ?? const []).length;
+    final eventCount = (exported['auditEvents'] as List<dynamic>? ?? const []).length;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Data export ready'),
+        content: Text(
+          'Exported at ${exported['exportedAt'] ?? 'now'}. '
+          'Includes $membershipCount membership${membershipCount == 1 ? '' : 's'} '
+          'and $eventCount audit event${eventCount == 1 ? '' : 's'}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmAccountDeletion(

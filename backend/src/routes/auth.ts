@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { z } from 'zod';
+import { recordEvent } from '../lib/audit';
+import { hasActiveLegalHold } from '../lib/legalHold';
 import { prisma } from '../lib/prisma';
+import { checkRateLimit } from '../lib/rateLimit';
 import {
   emailMatchesWorkplace,
   isVerificationCurrent,
@@ -25,6 +28,10 @@ const registerSchema = z.object({
   worksiteId: z.string().min(1),
   homeArea: z.string().min(1),
   corridor: z.string().min(1),
+  postcodeDistrict: z.string().min(2).max(8).optional(),
+  approxLatitude: z.number().min(-90).max(90).optional(),
+  approxLongitude: z.number().min(-180).max(180).optional(),
+  privacyRadiusMetres: z.number().int().min(100).max(5000).optional(),
   days: z.array(z.number().int().min(1).max(7)),
   arrivalMinutes: z.number().int(),
   departureMinutes: z.number().int(),
@@ -90,6 +97,11 @@ router.post('/register', async (req, res) => {
     return;
   }
   const data = parsed.data;
+  const rate = checkRateLimit(`register:${req.ip ?? 'unknown'}`, 10, 60_000);
+  if (!rate.allowed) {
+    res.status(429).json({ error: 'Too many registration attempts. Please wait a minute.' });
+    return;
+  }
   const existing = await prisma.user.findUnique({ where: { email: data.email } });
   if (existing) {
     res.status(409).json({ error: 'Email already registered' });
@@ -129,6 +141,10 @@ router.post('/register', async (req, res) => {
           role: data.role,
           homeArea: data.homeArea,
           corridor: data.corridor,
+          postcodeDistrict: data.postcodeDistrict,
+          approxLatitude: data.approxLatitude,
+          approxLongitude: data.approxLongitude,
+          privacyRadiusMetres: data.privacyRadiusMetres ?? 500,
           days: data.days,
           arrivalMinutes: data.arrivalMinutes,
           departureMinutes: data.departureMinutes,
@@ -285,13 +301,112 @@ router.patch('/preferences', requireAuth, async (req: AuthRequest, res) => {
   });
 });
 
-router.delete('/account', requireAuth, async (req: AuthRequest, res) => {
+router.get('/export', requireAuth, async (req: AuthRequest, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId },
-    include: { profile: { include: { memberships: { select: { circleId: true } } } } },
+    include: {
+      profile: {
+        include: {
+          memberships: true,
+          attendances: true,
+          cancellations: true,
+          worksite: { include: { workplace: true } },
+        },
+      },
+      notifications: true,
+      commuteRequests: true,
+      messageReports: true,
+    },
   });
   if (!user) {
     res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  const events = await prisma.domainEvent.findMany({
+    where: { actorUserId: user.id },
+    orderBy: { createdAt: 'asc' },
+    take: 500,
+  });
+  await recordEvent({
+    type: 'account.exported',
+    actorUserId: user.id,
+    subjectType: 'user',
+    subjectId: user.id,
+    payload: { eventCount: events.length },
+  });
+  res.json({
+    exportedAt: new Date().toISOString(),
+    user: {
+      id: user.id,
+      email: user.email,
+      createdAt: user.createdAt,
+      profile: user.profile
+        ? {
+            id: user.profile.id,
+            firstName: user.profile.firstName,
+            initials: user.profile.initials,
+            role: user.profile.role,
+            homeArea: user.profile.homeArea,
+            corridor: user.profile.corridor,
+            postcodeDistrict: user.profile.postcodeDistrict,
+            approxLatitude: user.profile.approxLatitude,
+            approxLongitude: user.profile.approxLongitude,
+            privacyRadiusMetres: user.profile.privacyRadiusMetres,
+            days: user.profile.days,
+            arrivalMinutes: user.profile.arrivalMinutes,
+            departureMinutes: user.profile.departureMinutes,
+            availableSeats: user.profile.availableSeats,
+            vehicleSummary: user.profile.vehicleSummary,
+            workplaceVerified: user.profile.workplaceVerified,
+            worksite: {
+              id: user.profile.worksite.id,
+              name: user.profile.worksite.name,
+              workplaceName: user.profile.worksite.workplace.name,
+            },
+          }
+        : null,
+    },
+    memberships: user.profile?.memberships ?? [],
+    attendances: user.profile?.attendances ?? [],
+    cancellations: user.profile?.cancellations ?? [],
+    commuteRequests: user.commuteRequests,
+    notifications: user.notifications,
+    messageReports: user.messageReports,
+    auditEvents: events,
+  });
+});
+
+router.delete('/account', requireAuth, async (req: AuthRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.userId },
+    include: {
+      profile: {
+        include: {
+          memberships: { select: { circleId: true } },
+          worksite: true,
+        },
+      },
+    },
+  });
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+  const held = await hasActiveLegalHold({
+    userId: user.id,
+    workplaceId: user.profile?.worksite.workplaceId,
+  });
+  if (held) {
+    await recordEvent({
+      type: 'account.delete_blocked',
+      actorUserId: user.id,
+      subjectType: 'user',
+      subjectId: user.id,
+      payload: { reason: 'legal_hold' },
+    });
+    res.status(423).json({
+      error: 'Account deletion is paused because of an active legal hold. Contact support.',
+    });
     return;
   }
   const circleIds = user.profile?.memberships.map((membership) => membership.circleId) ?? [];
@@ -305,6 +420,13 @@ router.delete('/account', requireAuth, async (req: AuthRequest, res) => {
         await transaction.commuteCircle.delete({ where: { id: circleId } });
       }
     }
+  });
+  await recordEvent({
+    type: 'account.deleted',
+    actorUserId: null,
+    subjectType: 'user',
+    subjectId: user.id,
+    payload: { emailDomain: user.email.split('@')[1] ?? null },
   });
   res.status(204).send();
 });
@@ -413,6 +535,10 @@ function toUserDto(user: any) {
           role: user.profile.role,
           homeArea: user.profile.homeArea,
           corridor: user.profile.corridor,
+          postcodeDistrict: user.profile.postcodeDistrict,
+          approxLatitude: user.profile.approxLatitude,
+          approxLongitude: user.profile.approxLongitude,
+          privacyRadiusMetres: user.profile.privacyRadiusMetres,
           days: user.profile.days,
           arrivalMinutes: user.profile.arrivalMinutes,
           departureMinutes: user.profile.departureMinutes,

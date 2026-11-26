@@ -46,4 +46,33 @@ describe('matching service', () => {
     expect(ranked).toHaveLength(1);
     expect(ranked[0].profile.id).toBe('u2');
   });
+
+  it('scores approximate postcode districts without exact home coordinates', () => {
+    const nearby = scoreMatch(
+      { ...base, homeArea: 'Sparkbrook', postcodeDistrict: 'B11' },
+      { ...driver, homeArea: 'Balsall Heath', postcodeDistrict: 'B11' },
+    );
+    expect(nearby.breakdown.area).toBe(20);
+    expect(nearby.positiveReasons.some((reason) => reason.message.includes('postcode'))).toBe(true);
+  });
+
+  it('scores nearby approximate corridor centres', () => {
+    const nearby = scoreMatch(
+      {
+        ...base,
+        homeArea: 'A',
+        corridor: 'other corridor',
+        approxLatitude: 52.48,
+        approxLongitude: -1.89,
+      },
+      {
+        ...driver,
+        homeArea: 'B',
+        corridor: 'different corridor',
+        approxLatitude: 52.481,
+        approxLongitude: -1.891,
+      },
+    );
+    expect(nearby.breakdown.area).toBe(18);
+  });
 });

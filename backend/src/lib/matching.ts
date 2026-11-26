@@ -1,3 +1,5 @@
+import { approxDistanceKm } from './approxDistance';
+
 export type MatchRole = 'driver' | 'passenger' | 'both';
 
 export interface MatchProfile {
@@ -8,6 +10,9 @@ export interface MatchProfile {
   worksiteId: string;
   homeArea: string;
   corridor: string;
+  postcodeDistrict?: string | null;
+  approxLatitude?: number | null;
+  approxLongitude?: number | null;
   days: number[];
   arrivalMinutes: number;
   departureMinutes: number;
@@ -109,18 +114,34 @@ export function scoreMatch(user: MatchProfile, candidate: MatchProfile): MatchRe
   }
 
   let area = 4;
-  if (user.homeArea === candidate.homeArea) {
+  const sameDistrict = !!user.postcodeDistrict
+    && !!candidate.postcodeDistrict
+    && user.postcodeDistrict.toUpperCase() === candidate.postcodeDistrict.toUpperCase();
+  const approxClose = user.approxLatitude != null
+    && user.approxLongitude != null
+    && candidate.approxLatitude != null
+    && candidate.approxLongitude != null
+    && approxDistanceKm(
+      { lat: user.approxLatitude, lng: user.approxLongitude },
+      { lat: candidate.approxLatitude, lng: candidate.approxLongitude },
+    ) <= 3;
+
+  if (user.homeArea === candidate.homeArea || sameDistrict) {
     area = 20;
     positives.push({
       type: 'area',
-      message: 'Starts from the same approximate area',
+      message: sameDistrict && user.homeArea !== candidate.homeArea
+        ? 'Same approximate postcode district'
+        : 'Starts from the same approximate area',
       estimated: true,
     });
-  } else if (user.corridor === candidate.corridor) {
-    area = 16;
+  } else if (approxClose || user.corridor === candidate.corridor) {
+    area = approxClose ? 18 : 16;
     positives.push({
       type: 'area',
-      message: 'Nearby area on the same broad corridor',
+      message: approxClose
+        ? 'Approximate corridor centres are within about 3 km'
+        : 'Nearby area on the same broad corridor',
       estimated: true,
     });
   } else {

@@ -49,6 +49,7 @@ abstract interface class AuthRepository {
   Future<RepositoryResult<AuthUser>> currentUser();
   Future<RepositoryResult<bool>> verifyWorkplaceEmail(String email);
   Future<RepositoryResult<AuthUser>> migrateLocalState(AppState localState);
+  Future<RepositoryResult<Map<String, dynamic>>> exportAccountData();
   Future<RepositoryResult<void>> deleteAccount();
   Future<void> logout();
 }

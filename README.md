@@ -14,7 +14,8 @@ It is **not** a public taxi marketplace, fare product or live-tracking app. The 
 | Distinctive slice | Commute Circles, confirmation, cancellation backup, reliability | `docs/plans/2026-07-15-001-feat-workplace-commuting-vertical-slice-plan.md` |
 | Server P1 | Auth, Circles, journeys, server matching, jobs, reliability, metrics | `docs/phase1_execution_report.md`, `backend/README.md` |
 | Workplace ops P2 | Invites, verification renewal, organiser tools, secure messaging | `docs/phase2_execution_report.md` |
-| Company scale | SSO, real push delivery, deeper employer admin | **`docs/master_efficiency_roadmap.md`** |
+| Hard reliability P3 | Audit events, SLO logs, export/retention, capacity hints, approx scoring | `docs/phase3_execution_report.md` |
+| Company scale | SSO, real push delivery, full offline outbox | **`docs/master_efficiency_roadmap.md`** |
 
 **North star:** verified colleagues form recurring Commute Circles that survive real working weeks (confirmations, cancellations, backups) without exposing exact home addresses or pretending to verify licences, insurance or character.
 

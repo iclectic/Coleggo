@@ -597,6 +597,18 @@ class AppController extends Notifier<AppState> {
     state = const AppState();
   }
 
+  Future<Map<String, dynamic>?> exportAccountData() async {
+    if (!ref.read(backendModeEnabledProvider)) return null;
+    final result = await ref.read(authRepositoryProvider).exportAccountData();
+    if (result.hasError) {
+      state = state.copyWith(
+        errorMessage: result.errorMessage ?? 'Your data export could not be prepared.',
+      );
+      return null;
+    }
+    return result.data;
+  }
+
   Future<bool> deleteAccount() async {
     if (!ref.read(backendModeEnabledProvider)) return false;
     final result = await ref.read(authRepositoryProvider).deleteAccount();

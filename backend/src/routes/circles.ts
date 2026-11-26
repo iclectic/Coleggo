@@ -1,8 +1,10 @@
 import { MembershipRole, RequestStatus } from '@prisma/client';
 import { Router } from 'express';
 import { z } from 'zod';
+import { recordEvent } from '../lib/audit';
 import { withIdempotency } from '../lib/idempotency';
 import { prisma } from '../lib/prisma';
+import { checkRateLimit } from '../lib/rateLimit';
 import { paramId, requireAuth, type AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -275,6 +277,13 @@ router.post('/:id/pause-participation', requireAuth, withIdempotency, async (req
     where: { circleId_profileId: { circleId: id, profileId: profile.id } },
     data: { paused: parsed.data.paused },
   });
+  await recordEvent({
+    type: 'membership.paused',
+    actorUserId: req.userId,
+    subjectType: 'circle',
+    subjectId: id,
+    payload: { paused: parsed.data.paused, membershipId: membership.id },
+  });
   res.json({ membership });
 });
 
@@ -296,12 +305,24 @@ router.post('/:id/leave', requireAuth, withIdempotency, async (req: AuthRequest,
       data: { state: 'archived' },
     });
   }
+  await recordEvent({
+    type: 'membership.left',
+    actorUserId: req.userId,
+    subjectType: 'circle',
+    subjectId: id,
+    payload: { remainingMembers: remaining },
+  });
   res.json({ left: true, remainingMembers: remaining });
 });
 
 router.post('/:id/join', requireAuth, withIdempotency, async (req: AuthRequest, res) => {
   const id = paramId(req, 'id');
   if (!id) { res.status(400).json({ error: 'Invalid id' }); return; }
+  const rate = checkRateLimit(`join:${req.userId}`, 10, 60_000);
+  if (!rate.allowed) {
+    res.status(429).json({ error: 'Too many join attempts. Please wait a minute.' });
+    return;
+  }
   const circle = await prisma.commuteCircle.findUnique({
     where: { id },
     include: { memberships: true, requests: true },
@@ -334,6 +355,13 @@ router.post('/:id/join', requireAuth, withIdempotency, async (req: AuthRequest, 
       type: 'join',
       message: req.body.message ?? '',
     },
+  });
+  await recordEvent({
+    type: 'membership.join_requested',
+    actorUserId: req.userId,
+    subjectType: 'circle',
+    subjectId: circle.id,
+    payload: { requestId: request.id },
   });
   res.status(201).json({ request });
 });
@@ -386,6 +414,13 @@ router.post('/:id/accept', requireAuth, withIdempotency, async (req: AuthRequest
       update: {},
     });
   }
+  await recordEvent({
+    type: 'membership.accepted',
+    actorUserId: req.userId,
+    subjectType: 'circle',
+    subjectId: circle.id,
+    payload: { requestId: request.id, requesterId: request.requesterId },
+  });
   res.json({ request });
 });
 

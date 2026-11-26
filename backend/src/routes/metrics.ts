@@ -1,6 +1,8 @@
 import { AttendanceStatus, JourneyState } from '@prisma/client';
 import { Router } from 'express';
+import { buildCapacityHints } from '../lib/capacityHints';
 import { prisma } from '../lib/prisma';
+import { getSloSnapshot } from '../lib/requestMetrics';
 import { requireAuth, type AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -14,9 +16,9 @@ router.get('/efficiency', requireAuth, async (req: AuthRequest, res) => {
   }
 
   const circles = await prisma.commuteCircle.findMany({
-    where: { worksiteId: profile.worksiteId, state: { in: ['active', 'full'] } },
+    where: { worksiteId: profile.worksiteId, state: { in: ['active', 'full', 'paused'] } },
     include: {
-      memberships: true,
+      memberships: { include: { profile: true } },
       journeys: {
         include: {
           attendances: true,
@@ -26,7 +28,7 @@ router.get('/efficiency', requireAuth, async (req: AuthRequest, res) => {
     },
   });
 
-  const activeCircles = circles.length;
+  const activeCircles = circles.filter((circle) => circle.state === 'active' || circle.state === 'full').length;
   let seatCapacity = 0;
   let occupiedSeats = 0;
   let expectedAttendances = 0;
@@ -35,6 +37,7 @@ router.get('/efficiency', requireAuth, async (req: AuthRequest, res) => {
   let cancelledWithBackup = 0;
 
   for (const circle of circles) {
+    if (circle.state !== 'active' && circle.state !== 'full') continue;
     seatCapacity += circle.seats;
     occupiedSeats += Math.min(circle.memberships.length, circle.seats);
 
@@ -72,6 +75,25 @@ router.get('/efficiency', requireAuth, async (req: AuthRequest, res) => {
     _count: { corridor: true },
   });
 
+  const worksiteProfiles = await prisma.profile.findMany({
+    where: { worksiteId: profile.worksiteId },
+    select: { corridor: true, days: true },
+  });
+  const capacityHints = buildCapacityHints({
+    profiles: worksiteProfiles,
+    circles: circles.map((circle) => {
+      const corridors = circle.memberships.map((member) => member.profile.corridor);
+      const corridorHint = corridors.sort((a, b) =>
+        corridors.filter((value) => value === b).length
+        - corridors.filter((value) => value === a).length)[0] ?? null;
+      return {
+        corridorHint,
+        days: circle.days,
+        seats: circle.seats,
+      };
+    }),
+  });
+
   res.json({
     worksiteId: profile.worksiteId,
     metrics: {
@@ -87,8 +109,24 @@ router.get('/efficiency', requireAuth, async (req: AuthRequest, res) => {
           commuterCount: group._count.corridor,
         }))
         .sort((a, b) => b.commuterCount - a.commuterCount),
+      capacityHints,
     },
   });
+});
+
+/** Rolling in-process API latency / error-budget snapshot for staging on-call. */
+router.get('/slo', requireAuth, async (_req: AuthRequest, res) => {
+  res.json({ slo: getSloSnapshot() });
+});
+
+/** Recent domain audit events for the authenticated actor (on-call diagnosis). */
+router.get('/audit-events', requireAuth, async (req: AuthRequest, res) => {
+  const events = await prisma.domainEvent.findMany({
+    where: { actorUserId: req.userId },
+    orderBy: { createdAt: 'desc' },
+    take: 100,
+  });
+  res.json({ events });
 });
 
 export default router;
