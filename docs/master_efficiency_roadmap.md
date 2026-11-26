@@ -131,7 +131,8 @@ Principles:
 
 ### Phase 2: Workplace operating system
 
-**Goal:** Make Coleggo efficient for a single employer or multi-site organisation.
+**Goal:** Make Coleggo efficient for a single employer or multi-site organisation.  
+**Status:** Slice executed on 26 November 2026. See `docs/phase2_execution_report.md`. SSO and real push delivery remain deferred.
 
 1. Employer/admin tenancy: organisations, worksites, invitation codes, domain allowlists, verification renewal.
 2. Optional SSO (OIDC) for company IdP.
@@ -242,7 +243,8 @@ Peer contributions may exist. Driver profit marketplaces should not.
 3. Add occurrence generation and confirmation-window jobs. **Done.**
 4. Instrument the efficiency metrics table above. **Done** (`GET /metrics/efficiency`).
 5. Run the prototype validation plan with 5–8 real commuters. **Next.**
-6. Only then expand to SSO, push and employer admin.
+6. Phase 2 workplace ops slice (invites, organiser tools, messaging). **Done.**
+7. Optional SSO (OIDC) and real push delivery. **Next after validation.**
 
 ## Critique of earlier plans (keep / change / drop)
 

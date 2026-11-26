@@ -94,6 +94,8 @@ See `.env.example` for required values.
 | `POST /auth/refresh` | Rotate refresh token and issue a new access token |
 | `GET /auth/me` | Fetch the authenticated user and profile |
 | `POST /auth/verify-workplace` | Verify workplace email domain (not driving fitness) |
+| `POST /auth/redeem-invite` | Resolve an employer invitation code |
+| `PATCH /auth/preferences` | Quiet hours preferences |
 | `GET /workplaces` | List workplaces and worksites |
 | `GET /matches` | Server-side explainable commute matches |
 | `GET /reliability/me` | Behavioural reliability signals for the current user |
@@ -105,6 +107,16 @@ See `.env.example` for required values.
 | `POST /circles/:id/join` | Request to join a circle |
 | `POST /circles/:id/accept` | Accept a pending join request (organiser only) |
 | `POST /circles/:id/decline` | Decline a pending join request (organiser only) |
+| `POST /circles/:id/pause` | Pause a circle (organiser) |
+| `POST /circles/:id/resume` | Resume a paused circle (organiser) |
+| `PATCH /circles/:id` | Update seats or departure window (organiser) |
+| `POST /circles/:id/backup-driver` | Nominate a backup driver (organiser) |
+| `GET /circles/:id/attendance-summary` | Privacy-safe attendance counts |
+| `POST /circles/:id/pause-participation` | Pause own membership |
+| `POST /circles/:id/leave` | Leave a circle |
+| `GET /circles/:id/messages` | List secure circle messages |
+| `POST /circles/:id/messages` | Send a secure circle message |
+| `POST /messages/:id/report` | Report a message for moderation |
 | `GET /journeys/next` | Get the next upcoming journey |
 | `POST /journeys/:id/confirm` | Confirm attendance for a journey |
 | `POST /journeys/:id/cancel` | Cancel a journey and list backup candidates |

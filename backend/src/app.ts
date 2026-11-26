@@ -9,6 +9,7 @@ import matchRoutes from './routes/matches';
 import reliabilityRoutes from './routes/reliability';
 import metricsRoutes from './routes/metrics';
 import jobRoutes from './routes/jobs';
+import messageRoutes from './routes/messages';
 import { getRuntimeConfig } from './lib/runtimeConfig';
 
 export function createApp() {
@@ -30,6 +31,7 @@ export function createApp() {
   app.use('/circles', circleRoutes);
   app.use('/journeys', journeyRoutes);
   app.use('/notifications', notificationRoutes);
+  app.use(messageRoutes);
 
   return app;
 }

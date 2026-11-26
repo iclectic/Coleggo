@@ -16,6 +16,9 @@ describe('Phase 1 production seam', () => {
 
   beforeAll(async () => {
     await prisma.$transaction([
+      prisma.messageModerationReport.deleteMany(),
+      prisma.message.deleteMany(),
+      prisma.messageThread.deleteMany(),
       prisma.idempotencyKey.deleteMany(),
       prisma.refreshToken.deleteMany(),
       prisma.cancellationRecord.deleteMany(),

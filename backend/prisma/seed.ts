@@ -5,6 +5,9 @@ const prisma = new PrismaClient();
 
 async function main() {
   await prisma.$transaction([
+    prisma.messageModerationReport.deleteMany(),
+    prisma.message.deleteMany(),
+    prisma.messageThread.deleteMany(),
     prisma.idempotencyKey.deleteMany(),
     prisma.refreshToken.deleteMany(),
     prisma.cancellationRecord.deleteMany(),
@@ -21,9 +24,17 @@ async function main() {
   ]);
 
   const passwordHash = await bcrypt.hash('Password123!', 10);
+  const verifiedAt = new Date();
 
   const workplace = await prisma.workplace.create({
-    data: { name: 'Northstar Works', slug: 'northstar', domain: 'northstar.example' },
+    data: {
+      name: 'Northstar Works',
+      slug: 'northstar',
+      domain: 'northstar.example',
+      allowedDomains: ['northstar-contractors.example'],
+      invitationCode: 'NORTH-PILOT',
+      verificationValidDays: 90,
+    },
   });
 
   const worksite = await prisma.worksite.create({
@@ -50,6 +61,7 @@ async function main() {
       availableSeats: 3,
       vehicleSummary: 'Blue estate, child seats available',
       workplaceVerified: true,
+      verifiedAt,
     },
     include: { user: true },
   });
@@ -73,6 +85,7 @@ async function main() {
       departureMinutes: 1050,
       availableSeats: 0,
       workplaceVerified: true,
+      verifiedAt,
     },
     include: { user: true },
   });
@@ -86,6 +99,7 @@ async function main() {
       departureWindow: '07:00-07:30',
       seats: 3,
       state: 'active',
+      backupDriverId: null,
       memberships: {
         create: [
           { profileId: driverProfile.id, role: 'organiser' },
@@ -96,6 +110,7 @@ async function main() {
   });
 
   console.log(`Seeded ${workplace.name} / ${worksite.name} / ${circle.name}`);
+  console.log('Invitation code: NORTH-PILOT');
   console.log('Demo logins: asha@northstar.example / ben@northstar.example password Password123!');
 }
 
