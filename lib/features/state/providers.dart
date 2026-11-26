@@ -8,6 +8,7 @@ import '../../data/models/match_result.dart';
 import '../../data/repositories/backend_circle_repository.dart';
 import '../../data/repositories/backend_domain_repositories.dart';
 import '../../data/repositories/backend_journey_repository.dart';
+import '../../data/repositories/backend_messaging_repository.dart';
 import '../../data/repositories/backend_repositories.dart';
 import '../../data/repositories/local_repositories.dart';
 import '../../data/repositories/repository_interfaces.dart';
@@ -103,7 +104,9 @@ final commuteRequestRepositoryProvider = Provider<CommuteRequestRepository>(
 );
 
 final messagingRepositoryProvider = Provider<MessagingRepository>(
-  (ref) => MockMessagingRepository(),
+  (ref) => _useBackend
+      ? BackendMessagingRepository(ref.watch(backendApiClientProvider))
+      : MockMessagingRepository(),
 );
 
 final notificationRepositoryProvider = Provider<NotificationRepository>(

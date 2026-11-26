@@ -66,6 +66,12 @@ router.get('/efficiency', requireAuth, async (req: AuthRequest, res) => {
     where: { worksiteId: profile.worksiteId },
   });
 
+  const corridorGroups = await prisma.profile.groupBy({
+    by: ['corridor'],
+    where: { worksiteId: profile.worksiteId },
+    _count: { corridor: true },
+  });
+
   res.json({
     worksiteId: profile.worksiteId,
     metrics: {
@@ -75,6 +81,12 @@ router.get('/efficiency', requireAuth, async (req: AuthRequest, res) => {
       lateCancellationRate: null,
       backupCoverage: cancelledJourneys === 0 ? null : cancelledWithBackup / cancelledJourneys,
       verificationIntegrity: totalProfiles === 0 ? 0 : verifiedProfiles / totalProfiles,
+      corridorDensity: corridorGroups
+        .map((group) => ({
+          corridor: group.corridor,
+          commuterCount: group._count.corridor,
+        }))
+        .sort((a, b) => b.commuterCount - a.commuterCount),
     },
   });
 });

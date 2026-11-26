@@ -98,18 +98,45 @@ class BackendCommuteCircleRepository implements CommuteCircleRepository {
     required String circleId,
     required String profileId,
     required bool paused,
-  }) async => const RepositoryResult.failure(
-    'Pausing circle participation is not available in backend mode yet.',
-  );
+  }) async {
+    try {
+      await _client.post<Map<String, dynamic>>(
+        '/circles/$circleId/pause-participation',
+        data: {'paused': paused},
+        idempotencyKey: 'pause-$circleId-$profileId-$paused',
+      );
+      final refreshed = await getCircles();
+      if (refreshed.hasError || refreshed.value == null) {
+        return RepositoryResult.data(circles);
+      }
+      return refreshed;
+    } on DioException catch (e) {
+      return RepositoryResult.failure(handleDioError(e));
+    }
+  }
 
   @override
   Future<RepositoryResult<List<CommuteCircle>>> leaveCircle({
     required List<CommuteCircle> circles,
     required String circleId,
     required String profileId,
-  }) async => const RepositoryResult.failure(
-    'Leaving a circle is not available in backend mode yet.',
-  );
+  }) async {
+    try {
+      await _client.post<Map<String, dynamic>>(
+        '/circles/$circleId/leave',
+        idempotencyKey: 'leave-$circleId-$profileId',
+      );
+      final refreshed = await getCircles();
+      if (refreshed.hasError || refreshed.value == null) {
+        return RepositoryResult.data(
+          circles.where((circle) => circle.id != circleId).toList(),
+        );
+      }
+      return refreshed;
+    } on DioException catch (e) {
+      return RepositoryResult.failure(handleDioError(e));
+    }
+  }
 
   CommuteCircle _mapCircle(Map<String, dynamic> json) {
     final members = (json['members'] as List<dynamic>? ?? const [])

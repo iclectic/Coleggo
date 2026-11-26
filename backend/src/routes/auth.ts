@@ -3,6 +3,11 @@ import bcrypt from 'bcrypt';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import {
+  emailMatchesWorkplace,
+  isVerificationCurrent,
+  verificationExpiresAt,
+} from '../lib/workplaceAccess';
+import {
   issueRefreshToken,
   requireAuth,
   rotateRefreshToken,
@@ -26,6 +31,7 @@ const registerSchema = z.object({
   role: z.enum(['driver', 'passenger', 'both']),
   availableSeats: z.number().int().default(0),
   vehicleSummary: z.string().optional(),
+  invitationCode: z.string().min(4).optional(),
 });
 
 const loginSchema = z.object({
@@ -89,10 +95,26 @@ router.post('/register', async (req, res) => {
     res.status(409).json({ error: 'Email already registered' });
     return;
   }
-  const worksite = await prisma.worksite.findUnique({ where: { id: data.worksiteId } });
+  const worksite = await prisma.worksite.findUnique({
+    where: { id: data.worksiteId },
+    include: { workplace: true },
+  });
   if (!worksite) {
     res.status(400).json({ error: 'Invalid worksite' });
     return;
+  }
+  if (data.invitationCode) {
+    const inviteWorkplace = await prisma.workplace.findUnique({
+      where: { invitationCode: data.invitationCode },
+    });
+    if (!inviteWorkplace || inviteWorkplace.id !== worksite.workplaceId) {
+      res.status(400).json({ error: 'Invitation code does not match the selected workplace' });
+      return;
+    }
+  }
+  if (!emailMatchesWorkplace(data.email, worksite.workplace) && !data.invitationCode) {
+    // Allow registration with invitation even when personal email is used;
+    // workplace verification still required before discovery trust.
   }
   const passwordHash = await bcrypt.hash(data.password, 10);
   const user = await prisma.user.create({
@@ -118,6 +140,36 @@ router.post('/register', async (req, res) => {
   });
   const payload = await authPayload(user.id);
   res.status(201).json(payload);
+});
+
+router.post('/redeem-invite', async (req, res) => {
+  const schema = z.object({ invitationCode: z.string().min(4) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid invitation code' });
+    return;
+  }
+  const workplace = await prisma.workplace.findUnique({
+    where: { invitationCode: parsed.data.invitationCode },
+    include: { worksites: true },
+  });
+  if (!workplace) {
+    res.status(404).json({ error: 'Invitation code not found' });
+    return;
+  }
+  res.json({
+    workplace: {
+      id: workplace.id,
+      name: workplace.name,
+      slug: workplace.slug,
+      domain: workplace.domain,
+      allowedDomains: [workplace.domain, ...workplace.allowedDomains],
+      worksites: workplace.worksites.map((worksite) => ({
+        id: worksite.id,
+        name: worksite.name,
+      })),
+    },
+  });
 });
 
 router.post('/login', async (req, res) => {
@@ -185,19 +237,51 @@ router.post('/verify-workplace', requireAuth, async (req: AuthRequest, res) => {
     res.status(404).json({ error: 'Profile not found' });
     return;
   }
-  const domain = parsed.data.email.split('@')[1];
-  const matches = domain === user.profile.worksite.workplace.domain;
+  const workplace = user.profile.worksite.workplace;
+  const matches = emailMatchesWorkplace(parsed.data.email, workplace);
+  let expiresAt: Date | null = null;
   if (matches) {
+    const verifiedAt = new Date();
     await prisma.profile.update({
       where: { id: user.profile.id },
-      data: { workplaceVerified: true },
+      data: { workplaceVerified: true, verifiedAt },
     });
+    expiresAt = verificationExpiresAt(verifiedAt, workplace.verificationValidDays);
   }
   res.json({
     verified: matches,
+    expiresAt,
     message: matches
-      ? 'Workplace domain matched. This confirms access to a workplace email, not driving ability, insurance, criminal history or personal character.'
-      : 'Email domain does not match the selected workplace.',
+      ? 'Workplace domain matched. This confirms access to a workplace email, not driving ability, insurance, criminal history or personal character. Verification renews periodically.'
+      : 'Email domain does not match the selected workplace allowlist.',
+  });
+});
+
+router.patch('/preferences', requireAuth, async (req: AuthRequest, res) => {
+  const schema = z.object({
+    quietHoursStart: z.number().int().min(0).max(1439).nullable().optional(),
+    quietHoursEnd: z.number().int().min(0).max(1439).nullable().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Invalid preferences' });
+    return;
+  }
+  const profile = await prisma.profile.findUnique({ where: { userId: req.userId } });
+  if (!profile) {
+    res.status(404).json({ error: 'Profile not found' });
+    return;
+  }
+  const updated = await prisma.profile.update({
+    where: { id: profile.id },
+    data: {
+      quietHoursStart: parsed.data.quietHoursStart ?? profile.quietHoursStart,
+      quietHoursEnd: parsed.data.quietHoursEnd ?? profile.quietHoursEnd,
+    },
+  });
+  res.json({
+    quietHoursStart: updated.quietHoursStart,
+    quietHoursEnd: updated.quietHoursEnd,
   });
 });
 
@@ -311,6 +395,13 @@ router.post('/migrate', requireAuth, async (req: AuthRequest, res) => {
 });
 
 function toUserDto(user: any) {
+  const workplace = user.profile?.worksite?.workplace;
+  const verificationCurrent = user.profile && workplace
+    ? isVerificationCurrent(user.profile, workplace)
+    : false;
+  const expiresAt = user.profile?.verifiedAt && workplace
+    ? verificationExpiresAt(user.profile.verifiedAt, workplace.verificationValidDays)
+    : null;
   return {
     id: user.id,
     email: user.email,
@@ -328,6 +419,11 @@ function toUserDto(user: any) {
           availableSeats: user.profile.availableSeats,
           vehicleSummary: user.profile.vehicleSummary,
           workplaceVerified: user.profile.workplaceVerified ?? false,
+          verificationCurrent,
+          verifiedAt: user.profile.verifiedAt,
+          verificationExpiresAt: expiresAt,
+          quietHoursStart: user.profile.quietHoursStart,
+          quietHoursEnd: user.profile.quietHoursEnd,
           worksite: {
             id: user.profile.worksite.id,
             name: user.profile.worksite.name,
@@ -335,6 +431,7 @@ function toUserDto(user: any) {
               id: user.profile.worksite.workplace.id,
               name: user.profile.worksite.workplace.name,
               domain: user.profile.worksite.workplace.domain,
+              verificationValidDays: user.profile.worksite.workplace.verificationValidDays,
             },
           },
         }

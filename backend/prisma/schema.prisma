@@ -52,40 +52,57 @@ enum AttendanceStatus {
   unsure
 }
 
+enum MessageDeliveryState {
+  stored
+  flagged
+  removed
+}
+
+enum ModerationReportStatus {
+  submitted
+  reviewed
+  dismissed
+}
+
 model User {
-  id              String         @id @default(cuid())
-  email           String         @unique
+  id              String           @id @default(cuid())
+  email           String           @unique
   passwordHash    String
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   profile         Profile?
   notifications   Notification[]
   commuteRequests CommuteRequest[]
   refreshTokens   RefreshToken[]
+  messageReports  MessageModerationReport[]
 
   @@map("users")
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   revokedAt DateTime?
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("refresh_tokens")
 }
 
 model Workplace {
-  id        String     @id @default(cuid())
-  name      String
-  slug      String     @unique
-  domain    String     @unique
-  createdAt DateTime   @default(now())
-  worksites Worksite[]
+  id                     String     @id @default(cuid())
+  name                   String
+  slug                   String     @unique
+  domain                 String     @unique
+  /// Comma-separated extra allowed email domains beyond the primary domain.
+  allowedDomains         String[]   @default([])
+  invitationCode         String?    @unique
+  verificationValidDays  Int        @default(90)
+  createdAt              DateTime   @default(now())
+  worksites              Worksite[]
 
   @@map("workplaces")
 }
@@ -104,27 +121,32 @@ model Worksite {
 }
 
 model Profile {
-  id               String             @id @default(cuid())
-  userId           String             @unique
-  worksiteId       String
-  firstName        String
-  initials         String
-  role             CommuteRole
-  homeArea         String
-  corridor         String
-  days             Int[]
-  arrivalMinutes   Int
-  departureMinutes Int
-  availableSeats   Int                @default(0)
-  vehicleSummary   String?
-  workplaceVerified Boolean           @default(false)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  worksite         Worksite           @relation(fields: [worksiteId], references: [id])
-  memberships      CircleMembership[]
-  attendances      Attendance[]
-  cancellations    CancellationRecord[]
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  worksiteId         String
+  firstName          String
+  initials           String
+  role               CommuteRole
+  homeArea           String
+  corridor           String
+  days               Int[]
+  arrivalMinutes     Int
+  departureMinutes   Int
+  availableSeats     Int                @default(0)
+  vehicleSummary     String?
+  workplaceVerified  Boolean            @default(false)
+  verifiedAt         DateTime?
+  /// Quiet hours start minute-of-day (0-1439). Null means no quiet hours.
+  quietHoursStart    Int?
+  quietHoursEnd      Int?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  worksite           Worksite           @relation(fields: [worksiteId], references: [id])
+  memberships        CircleMembership[]
+  attendances        Attendance[]
+  cancellations      CancellationRecord[]
+  sentMessages       Message[]
 
   @@map("profiles")
 }
@@ -138,11 +160,13 @@ model CommuteCircle {
   departureWindow String
   seats           Int
   state           CircleState        @default(active)
+  backupDriverId  String?
   createdAt       DateTime           @default(now())
   worksite        Worksite           @relation(fields: [worksiteId], references: [id])
   memberships     CircleMembership[]
   requests        CommuteRequest[]
   journeys        JourneyOccurrence[]
+  messageThread   MessageThread?
 
   @@map("commute_circles")
 }
@@ -152,6 +176,7 @@ model CircleMembership {
   circleId  String
   profileId String
   role      MembershipRole
+  paused    Boolean        @default(false)
   joinedAt  DateTime       @default(now())
   circle    CommuteCircle  @relation(fields: [circleId], references: [id], onDelete: Cascade)
   profile   Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -240,4 +265,45 @@ model IdempotencyKey {
 
   @@unique([userId, key, method, path])
   @@map("idempotency_keys")
+}
+
+model MessageThread {
+  id        String        @id @default(cuid())
+  circleId  String        @unique
+  createdAt DateTime      @default(now())
+  archived  Boolean       @default(false)
+  circle    CommuteCircle @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  messages  Message[]
+
+  @@map("message_threads")
+}
+
+model Message {
+  id               String               @id @default(cuid())
+  threadId         String
+  senderProfileId  String
+  body             String
+  deliveryState    MessageDeliveryState @default(stored)
+  createdAt        DateTime             @default(now())
+  thread           MessageThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender           Profile              @relation(fields: [senderProfileId], references: [id], onDelete: Cascade)
+  reports          MessageModerationReport[]
+
+  @@index([threadId, createdAt])
+  @@index([senderProfileId, createdAt])
+  @@map("messages")
+}
+
+model MessageModerationReport {
+  id         String                 @id @default(cuid())
+  messageId  String
+  reporterId String
+  reason     String
+  status     ModerationReportStatus @default(submitted)
+  createdAt  DateTime               @default(now())
+  message    Message                @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reporter   User                   @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, reporterId])
+  @@map("message_moderation_reports")
 }
